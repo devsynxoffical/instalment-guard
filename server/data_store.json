@@ -1,0 +1,18 @@
+{
+  "retailers": [],
+  "devices": [],
+  "contracts": [],
+  "commands": [],
+  "bleRelays": [],
+  "auditLogs": [
+    {
+      "id": "LOG-1001",
+      "timestamp": "2026-09-22T11:40:00.000Z",
+      "performer": "Super Admin",
+      "role": "SUPER_ADMIN",
+      "action": "SYSTEM_INITIALIZED",
+      "target": "Node.js Core Engine",
+      "details": "Clean System Initialized - 0 Dummy Stores, Ready for Fresh Partner Store Registrations."
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserData().role == 'SUPER_ADMIN';
+    }
+
+    function isRetailer() {
+      return isAuthenticated() && getUserData().role == 'RETAILER';
+    }
+
+    function isOwnRetailer(retailerId) {
+      return isRetailer() && getUserData().retailerId == retailerId;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || request.auth.uid == userId;
+    }
+
+    // Retailers Collection
+    match /retailers/{retailerId} {
+      allow read: if isSuperAdmin() || isOwnRetailer(retailerId);
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Devices Collection
+    match /devices/{deviceId} {
+      allow read: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow create: if isSuperAdmin() || isRetailer();
+      allow update: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Contracts Collection
+    match /contracts/{contractId} {
+      allow read: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow create, update: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Payments Collection
+    match /payments/{paymentId} {
+      allow read: if isSuperAdmin() || isRetailer();
+      allow create: if isSuperAdmin() || isRetailer();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Credit Transactions Collection
+    match /creditTransactions/{txId} {
+      allow read: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow create: if isSuperAdmin() || isRetailer();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Device Commands Collection
+    match /deviceCommands/{cmdId} {
+      allow read: if isSuperAdmin() || isRetailer();
+      allow create: if isSuperAdmin() || isRetailer();
+      allow update: if isSuperAdmin() || isRetailer();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Device Telemetry Collection
+    match /deviceTelemetry/{telemetryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Audit Logs Collection
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin() || (isRetailer() && resource.data.retailerId == getUserData().retailerId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Notifications Collection
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+  }
+}

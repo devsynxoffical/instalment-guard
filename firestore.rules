@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for security enforcement
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    function isTargetDevice(deviceId) {
+      return request.auth != null && request.auth.uid == deviceId;
+    }
+
+    // Devices Collection
+    match /devices/{deviceId} {
+      // Allow managed device to read its own record
+      allow read: if isTargetDevice(deviceId) || isAdmin();
+      
+      // Allow initial registration during provisioning
+      allow create: if request.auth != null;
+      
+      // Devices can ONLY update check-in metrics (lastCheckIn, batteryLevel, networkState).
+      // Devices CANNOT alter deviceStatus, contractId, or managementStatus.
+      allow update: if (isTargetDevice(deviceId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['deviceStatus', 'contractId', 'managementStatus'])) 
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // Contracts Collection
+    match /contracts/{contractId} {
+      // Read allowed for authenticated devices linked to contract
+      allow read: if request.auth != null;
+      // Write strictly restricted to Admin role
+      allow write: if isAdmin();
+    }
+
+    // Installment Schedules & Payment Records
+    match /installments/{installmentId} {
+      allow read: if request.auth != null;
+      // Devices CANNOT mark their own installments as paid
+      allow write: if isAdmin();
+    }
+
+    // Admin Commands Collection
+    match /admin_commands/{commandId} {
+      // Device can read pending commands assigned to its deviceId
+      allow read: if request.auth != null && resource.data.deviceId == request.auth.uid;
+      // Only device can update command execution status to EXECUTED / FAILED
+      allow update: if request.auth != null && resource.data.deviceId == request.auth.uid;
+      // Admin issues commands
+      allow create, delete: if isAdmin();
+    }
+
+    // Audit Logs Collection
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null;
+    }
+  }
+}

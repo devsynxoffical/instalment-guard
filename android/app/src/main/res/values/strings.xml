@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Installment Guard</string>
+    <string name="admin_receiver_description">Installment Guard Android Device Management Component</string>
+</resources>

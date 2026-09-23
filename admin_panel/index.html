@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Installment Guard Admin Panel</title>
+    <!-- Google Fonts Plus Jakarta Sans & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              crextio: {
+                bg: '#F5F3EC',
+                card: '#FFFFFF',
+                dark: '#202225',
+                darkHover: '#2A2C30',
+                gold: '#FFD54F',
+                goldHover: '#FFCA28',
+                accentYellow: '#FACC15',
+                textDark: '#18181B',
+                textMuted: '#71717A',
+                border: '#E8E5DA',
+              },
+              teal: {
+                50: '#F0FDFA',
+                100: '#CCFBF1',
+                200: '#99F6E4',
+                500: '#14B8A6',
+                700: '#0F766E',
+                800: '#115E59',
+                900: '#134E4A',
+              },
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+              display: ['Outfit', 'sans-serif'],
+            },
+            borderRadius: {
+              '3xl': '1.5rem',
+              '4xl': '2rem',
+            }
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-teal-700 selection:text-white min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
