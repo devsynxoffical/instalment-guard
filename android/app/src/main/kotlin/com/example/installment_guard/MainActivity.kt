@@ -17,6 +17,11 @@ class MainActivity : FlutterActivity() {
 
         requestLocationPermissionsIfNeeded()
 
+        val policyService = DevicePolicyService(this, this)
+        if (policyService.isManagedDevice()) {
+            policyService.applyPolicyRestrictions()
+        }
+
         val channelHandler = DeviceManagementChannelHandler(this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -44,6 +49,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        val policyService = DevicePolicyService(this, this)
+        if (policyService.isManagedDevice()) {
+            policyService.applyPolicyRestrictions()
+        }
         enforceLockStateIfNeeded()
     }
 
