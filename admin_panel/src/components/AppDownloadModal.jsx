@@ -14,7 +14,9 @@ export default function AppDownloadModal({ isOpen, onClose }) {
 
   const [serverHost, setServerHost] = useState(defaultHost);
   const [copied, setCopied] = useState(false);
+  const [copiedAdb, setCopiedAdb] = useState(false);
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
+  const [qrMode, setQrMode] = useState('dpc'); // 'dpc' | 'direct'
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   // Retailer Scope
@@ -31,11 +33,24 @@ export default function AppDownloadModal({ isOpen, onClose }) {
 
   const retailerQuery = effectiveRetailerId ? `?retailerId=${encodeURIComponent(effectiveRetailerId)}` : '';
   const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk${retailerQuery}`;
-  const backendQrUrl = `/api/qr?text=${encodeURIComponent(apkUrl)}`;
+
+  // Android Enterprise Zero-Touch Device Owner Provisioning Payload
+  const dpcProvisioningPayload = JSON.stringify({
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.example.installment_guard/com.example.installment_guard.device.InstallmentAdminReceiver",
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": apkUrl,
+    "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
+    "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
+      "retailerId": effectiveRetailerId || "RET-101",
+      "serverUrl": `${baseUrl.replace(/\/+$/, '')}/api`
+    }
+  });
+
+  const activeQrText = qrMode === 'dpc' ? dpcProvisioningPayload : apkUrl;
+  const backendQrUrl = `/api/qr?text=${encodeURIComponent(activeQrText)}`;
 
   useEffect(() => {
     let isMounted = true;
-    generateQRCodeDataUrl(apkUrl, {
+    generateQRCodeDataUrl(activeQrText, {
       size: 320,
       bgColor: '#FFFFFF',
       fgColor: '#000000',
@@ -47,12 +62,20 @@ export default function AppDownloadModal({ isOpen, onClose }) {
       if (isMounted) setQrDataUrl(backendQrUrl);
     });
     return () => { isMounted = false; };
-  }, [apkUrl, backendQrUrl]);
+  }, [activeQrText, backendQrUrl]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(apkUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const adbCommand = `adb shell dpm set-device-owner com.example.installment_guard/.device.InstallmentAdminReceiver`;
+
+  const handleCopyAdb = () => {
+    navigator.clipboard.writeText(adbCommand);
+    setCopiedAdb(true);
+    setTimeout(() => setCopiedAdb(false), 2500);
   };
 
   if (!isOpen) return null;
@@ -116,12 +139,39 @@ export default function AppDownloadModal({ isOpen, onClose }) {
         <div className="p-6">
           {activeTab === 'qr' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              
+              {/* QR Mode Switcher */}
+              <div className="md:col-span-2 flex items-center justify-center gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setQrMode('dpc')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    qrMode === 'dpc'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Anti-Tamper Device Owner QR (6-Taps Setup)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrMode('direct')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    qrMode === 'direct'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Download className="w-4 h-4" />
+                  Direct APK Download QR (Camera Scan)
+                </button>
+              </div>
+
               {/* QR Code Container */}
               <div className="flex flex-col items-center justify-center p-5 bg-slate-950/60 rounded-2xl border border-slate-800 shadow-inner">
                 <div 
                   className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer flex items-center justify-center min-w-[240px] min-h-[240px]"
-                  title="Scan with phone camera or QR Reader"
+                  title={qrMode === 'dpc' ? "Scan during Android 6-taps Welcome screen" : "Scan with camera to download APK"}
                 >
                   {qrDataUrl ? (
                     <img 
@@ -135,9 +185,11 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                     </div>
                   )}
                 </div>
-                <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5">
-                  <Wifi className="w-3.5 h-3.5 text-amber-400" />
-                  Scan with Android Camera / QR App
+                <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5 text-center">
+                  <Wifi className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  {qrMode === 'dpc' 
+                    ? 'Scan with Android 6-Taps Provisioning Reader' 
+                    : 'Scan with Android Camera to Download APK'}
                 </p>
               </div>
 
@@ -226,51 +278,48 @@ export default function AppDownloadModal({ isOpen, onClose }) {
           ) : (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-2">
-                Device Owner Onboarding & QR Provisioning Instructions
+                Anti-Tamper Device Owner Provisioning Guide
               </h3>
               
               <div className="space-y-3 text-xs">
                 <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800 flex gap-3 items-start">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
-                    1
+                  <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                    A
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-200">Prepare Customer Device</h4>
-                    <p className="text-slate-400 mt-0.5">
-                      Ensure the phone is on the Factory Reset / Initial Setup Screen ("Welcome" / "Hi there").
+                  <div className="space-y-1">
+                    <h4 className="font-semibold text-slate-200">Method 1: Production Handover (6-Taps Zero-Touch Setup)</h4>
+                    <p className="text-slate-400">
+                      On new/factory reset phone: Tap <strong>6 times</strong> on blank space of the "Welcome / Start" screen. Scan the <strong>Anti-Tamper Device Owner QR</strong>. Android automatically sets the app as permanent Device Owner, completely locking out factory reset and uninstallation.
                     </p>
                   </div>
                 </div>
 
                 <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800 flex gap-3 items-start">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
-                    2
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                    B
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-200">Activate Secret QR Scanner</h4>
-                    <p className="text-slate-400 mt-0.5">
-                      Tap 6 times on any blank area of the initial "Welcome" screen until Android opens the QR Code Scanner.
+                  <div className="space-y-2 flex-1">
+                    <h4 className="font-semibold text-slate-200">Method 2: Existing Phone (Without Factory Reset via ADB)</h4>
+                    <p className="text-slate-400">
+                      Install APK directly, enable USB debugging, and execute this 1-line command on PC/terminal:
                     </p>
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl p-2 font-mono text-[11px] text-amber-300">
+                      <span className="flex-1 select-all">{adbCommand}</span>
+                      <button
+                        onClick={handleCopyAdb}
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                      >
+                        {copiedAdb ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedAdb ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800 flex gap-3 items-start">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-slate-200">Scan & Auto-Enroll Device Owner</h4>
-                    <p className="text-slate-400 mt-0.5">
-                      Scan the QR Code from the QR tab. The phone will automatically connect to Wi-Fi, download Installment Guard, and grant non-removable Device Owner privileges.
-                    </p>
-                  </div>
-                </div>
-
               </div>
 
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs flex items-center gap-2 mt-4">
                 <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Device Owner status prevents customer from factory resetting or uninstalling the app until installments are completed.</span>
+                <span>Once Device Owner is active, Android OS permanently disables Factory Reset in Settings and greys out the Uninstall button.</span>
               </div>
             </div>
           )}
