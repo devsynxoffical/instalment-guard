@@ -332,8 +332,17 @@ app.get('/api/qr', async (req, res) => {
   }
 });
 
+// IP to Retailer download association cache
+const recentDownloadsByIp = new Map();
+
 // GET APK Direct Download Handler
 app.get('/download/installment_guard.apk', (req, res) => {
+  const retailerId = req.query.retailerId;
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+  if (retailerId && clientIp) {
+    recentDownloadsByIp.set(clientIp, { retailerId, timestamp: Date.now() });
+  }
+
   // 1. Check if external direct APK download URL is configured in Environment Variables
   if (process.env.APK_DOWNLOAD_URL) {
     return res.redirect(process.env.APK_DOWNLOAD_URL);
@@ -417,6 +426,47 @@ app.get('/api/devices/:deviceId', async (req, res) => {
   }
 });
 
+// PUT / POST Update Device Contract & Installment Plan
+app.put('/api/devices/:deviceId/contract', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const contractData = req.body;
+    const result = await store.updateDeviceContract(deviceId, contractData);
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+    broadcastDeviceUpdate(result.device);
+    io.emit('contract_updated', result.contract);
+    await store.addAuditLog(
+      contractData.performerName || 'Admin / Retailer',
+      contractData.role || 'RETAILER',
+      'CONTRACT_UPDATED',
+      `${deviceId} (${result.contract.contractId})`,
+      `Updated installment plan for customer ${result.contract.customerName}: Total Rs. ${result.contract.totalPrice}, DownPayment Rs. ${result.contract.downPayment}, Monthly Rs. ${result.contract.monthlyInstallment}`
+    );
+    res.json({ success: true, message: 'Installment contract updated successfully in database', data: result });
+  } catch (e) {
+    console.error('Update contract error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+app.post('/api/devices/:deviceId/contract', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const contractData = req.body;
+    const result = await store.updateDeviceContract(deviceId, contractData);
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+    broadcastDeviceUpdate(result.device);
+    io.emit('contract_updated', result.contract);
+    res.json({ success: true, message: 'Installment contract updated successfully in database', data: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // DELETE Device Endpoint
 app.delete('/api/devices/:deviceId', async (req, res) => {
   try {
@@ -455,8 +505,16 @@ app.delete('/api/devices/:deviceId', async (req, res) => {
 app.post('/api/devices/:deviceId/telemetry', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const telemetryData = req.body;
+    const telemetryData = req.body || {};
     telemetryData.deviceId = deviceId;
+
+    if (!telemetryData.retailerId) {
+      const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+      const ipRecord = recentDownloadsByIp.get(clientIp);
+      if (ipRecord && (Date.now() - ipRecord.timestamp < 3600000)) {
+        telemetryData.retailerId = ipRecord.retailerId;
+      }
+    }
 
     const updatedDevice = await store.upsertDevice(telemetryData);
     broadcastDeviceUpdate(updatedDevice);

@@ -535,6 +535,84 @@ class DataStore {
     return null;
   }
 
+  async updateDeviceContract(deviceId, data) {
+    await this.initDb();
+    const dev = await this.getDeviceById(deviceId);
+    if (!dev) return null;
+
+    const deviceModelInstance = await DeviceModel.findByPk(dev.deviceId);
+    if (!deviceModelInstance) return null;
+
+    let contractId = deviceModelInstance.contractId || dev.contractId;
+    if (!contractId || contractId === 'undefined') {
+      contractId = `CTR-${dev.deviceId.substring(0, 8).toUpperCase()}`;
+      deviceModelInstance.contractId = contractId;
+    }
+
+    let contract = await ContractModel.findByPk(contractId);
+
+    const totalPrice = parseFloat(data.totalPrice) || 60000;
+    const downPayment = parseFloat(data.downPayment) || 0;
+    const totalMonths = parseInt(data.totalMonths || data.tenureMonths) || 6;
+    const remainingBalance = data.remainingBalance !== undefined
+      ? parseFloat(data.remainingBalance)
+      : Math.max(0, totalPrice - downPayment);
+    const monthlyInstallment = parseFloat(data.monthlyInstallment) || (totalMonths > 0 ? Math.round(remainingBalance / totalMonths) : 0);
+
+    const contractPayload = {
+      contractId,
+      customerId: data.customerId || dev.customerId || `CUST-${dev.deviceId.substring(0, 6).toUpperCase()}`,
+      customerName: data.customerName || (contract ? contract.customerName : 'Customer'),
+      customerPhone: data.customerPhone || (contract ? contract.customerPhone : '+92 300 1234567'),
+      customerCnic: data.customerCnic || (contract ? contract.customerCnic : '42101-1234567-1'),
+      deviceId: dev.deviceId,
+      deviceModel: data.deviceModel || dev.model || 'Smartphone',
+      assetCategory: 'SMARTPHONE',
+      serialNumber: dev.imei || dev.deviceId,
+      retailerId: data.retailerId || dev.retailerId || 'SUPER_ADMIN',
+      totalPrice,
+      downPayment,
+      remainingBalance,
+      monthlyInstallment,
+      dueDateDay: parseInt(data.dueDateDay || data.installmentDueDay) || 5,
+      nextDueDate: data.nextDueDate || (contract ? contract.nextDueDate : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]),
+      paidMonths: parseInt(data.paidMonths) || 0,
+      totalMonths,
+      status: remainingBalance <= 0 ? 'COMPLETED' : 'ACTIVE',
+      notes: data.notes || '',
+    };
+
+    if (contract) {
+      await contract.update(contractPayload);
+    } else {
+      contract = await ContractModel.create(contractPayload);
+    }
+
+    if (data.unlockPin) {
+      deviceModelInstance.unlockPin = data.unlockPin;
+    }
+    if (data.customerName) deviceModelInstance.customerName = data.customerName;
+    if (data.customerPhone) deviceModelInstance.customerPhone = data.customerPhone;
+    if (data.customerCnic) deviceModelInstance.customerCnic = data.customerCnic;
+    if (contractPayload.retailerId) {
+      deviceModelInstance.retailerId = contractPayload.retailerId;
+      const retObj = await RetailerModel.findByPk(contractPayload.retailerId);
+      if (retObj) {
+        deviceModelInstance.retailerName = retObj.businessName;
+        deviceModelInstance.retailerPhone = retObj.phone;
+        deviceModelInstance.retailerAddress = retObj.address;
+      }
+    }
+    deviceModelInstance.customerId = contractPayload.customerId;
+    deviceModelInstance.contractId = contractId;
+    await deviceModelInstance.save();
+
+    return {
+      device: deviceModelInstance.toJSON(),
+      contract: contract.toJSON(),
+    };
+  }
+
   async checkDefaulterStatus(queryStr) {
     await this.initDb();
     if (!queryStr) return { isDefaulter: false, matches: [] };

@@ -30,6 +30,12 @@ import {
   Key,
   Flame,
   X,
+  FileText,
+  Calendar,
+  DollarSign,
+  User,
+  Phone,
+  Edit3,
 } from 'lucide-react';
 import { deviceService } from '../services/deviceService';
 
@@ -38,7 +44,7 @@ import { API_BASE_URL } from '../config/api';
 export const DeviceDetailPage = () => {
   const { deviceId } = useParams();
   const navigate = useNavigate();
-  const { devices, contracts, retailers, deleteDevice } = useAuth();
+  const { devices, contracts, retailers, deleteDevice, currentUser, role } = useAuth();
   const { showToast } = useToast();
 
   const [liveDeviceData, setLiveDeviceData] = useState(null);
@@ -76,6 +82,92 @@ export const DeviceDetailPage = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [customPin, setCustomPin] = useState(device?.unlockPin || '1234');
   const [lockMsg, setLockMsg] = useState('Installment Overdue: Please contact store to pay.');
+
+  // Edit Installment Plan & Contract Modal state
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [savingContract, setSavingContract] = useState(false);
+  const [contractForm, setContractForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerCnic: '',
+    totalPrice: 60000,
+    downPayment: 15000,
+    totalMonths: 6,
+    monthlyInstallment: 7500,
+    dueDateDay: 5,
+    nextDueDate: '',
+    unlockPin: '1234',
+    notes: '',
+  });
+
+  const openContractModal = () => {
+    const defaultTotal = contract.totalPrice || device?.totalPrice || 60000;
+    const defaultDown = contract.downPayment || device?.downPayment || 15000;
+    const defaultMonths = contract.totalMonths || 6;
+    const defaultRemaining = Math.max(0, defaultTotal - defaultDown);
+    const defaultMonthly = contract.monthlyInstallment || (defaultMonths > 0 ? Math.round(defaultRemaining / defaultMonths) : defaultRemaining);
+
+    setContractForm({
+      customerName: contract.customerName || device?.customerName || 'Customer',
+      customerPhone: contract.customerPhone || device?.customerPhone || '+92 300 1234567',
+      customerCnic: contract.customerCnic || device?.customerCnic || '42101-1234567-1',
+      retailerId: device?.retailerId || contract.retailerId || currentUser?.retailerId || 'RET-101',
+      totalPrice: defaultTotal,
+      downPayment: defaultDown,
+      totalMonths: defaultMonths,
+      monthlyInstallment: defaultMonthly,
+      dueDateDay: contract.dueDateDay || 5,
+      nextDueDate: contract.nextDueDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      unlockPin: device?.unlockPin || '1234',
+      notes: contract.notes || '',
+    });
+    setShowContractModal(true);
+  };
+
+  const handleContractFormChange = (field, value) => {
+    setContractForm((prev) => {
+      const updated = { ...prev, [field]: value };
+      if (field === 'totalPrice' || field === 'downPayment' || field === 'totalMonths') {
+        const total = field === 'totalPrice' ? parseFloat(value) || 0 : prev.totalPrice;
+        const down = field === 'downPayment' ? parseFloat(value) || 0 : prev.downPayment;
+        const months = field === 'totalMonths' ? parseInt(value) || 1 : prev.totalMonths;
+        const rem = Math.max(0, total - down);
+        updated.monthlyInstallment = months > 0 ? Math.round(rem / months) : rem;
+      }
+      return updated;
+    });
+  };
+
+  const handleSaveContract = async (e) => {
+    e.preventDefault();
+    setSavingContract(true);
+    try {
+      const payload = {
+        ...contractForm,
+        performerName: currentUser?.name || 'Admin',
+        role: role || 'RETAILER',
+      };
+      const res = await fetch(`${API_BASE_URL}/api/devices/${encodeURIComponent(device.deviceId)}/contract`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Installment plan & contract updated successfully!', 'success');
+        setShowContractModal(false);
+        if (data.data?.device) {
+          setLiveDeviceData(data.data.device);
+        }
+      } else {
+        showToast(data.message || 'Failed to update contract', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Error updating contract', 'error');
+    } finally {
+      setSavingContract(false);
+    }
+  };
 
   useEffect(() => {
     if (device?.deviceId) {
@@ -161,6 +253,14 @@ export const DeviceDetailPage = () => {
         description={`Device ID: ${device.deviceId} • IMEI: ${device.imei || 'N/A'}`}
         action={
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={openContractModal}
+              className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+            >
+              <Edit3 className="w-4 h-4 shrink-0" />
+              <span>Edit Installment Plan</span>
+            </button>
+
             <button
               onClick={() => setShowPinModal(true)}
               className="btn-danger font-bold text-xs py-2 px-3.5 inline-flex items-center gap-2 whitespace-nowrap bg-rose-600 hover:bg-rose-700"
@@ -263,12 +363,21 @@ export const DeviceDetailPage = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate('/payments/new')}
-            className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-2 self-start sm:self-auto"
-          >
-            <CreditCard className="w-4 h-4" /> Record Installment Payment
-          </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={openContractModal}
+              className="py-2 px-3.5 text-xs font-bold rounded-xl bg-teal-50 border border-teal-300 text-teal-800 hover:bg-teal-100 flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <FileText className="w-4 h-4 text-teal-700" /> Edit Plan & Customer Details
+            </button>
+
+            <button
+              onClick={() => navigate('/payments/new')}
+              className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-2"
+            >
+              <CreditCard className="w-4 h-4" /> Record Installment Payment
+            </button>
+          </div>
         </div>
 
         {/* Progress Bar & Details */}
@@ -528,6 +637,220 @@ export const DeviceDetailPage = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Installment Plan & Contract Modal */}
+      {showContractModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl p-6 sm:p-7 space-y-5 text-slate-100 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-teal-500/15 text-teal-400 border border-teal-500/30">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    Edit Installment Contract & Plan
+                  </h3>
+                  <p className="text-xs text-slate-400">Update pricing, customer details, tenure, and payment terms</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowContractModal(false)}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveContract} className="space-y-4">
+              {/* Customer Details Section */}
+              <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-4 h-4" /> Customer Information
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Customer Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={contractForm.customerName}
+                      onChange={(e) => handleContractFormChange('customerName', e.target.value)}
+                      className="input-field text-xs"
+                      placeholder="e.g. Muhammad Ali"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Customer Phone Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={contractForm.customerPhone}
+                      onChange={(e) => handleContractFormChange('customerPhone', e.target.value)}
+                      className="input-field text-xs"
+                      placeholder="+92 300 1234567"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Customer CNIC Number</label>
+                    <input
+                      type="text"
+                      value={contractForm.customerCnic}
+                      onChange={(e) => handleContractFormChange('customerCnic', e.target.value)}
+                      className="input-field text-xs"
+                      placeholder="42101-1234567-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Installment Pricing & Plan Section */}
+              <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4" /> Pricing & Installment Schedule
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Total Price (PKR) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1000}
+                      value={contractForm.totalPrice}
+                      onChange={(e) => handleContractFormChange('totalPrice', e.target.value)}
+                      className="input-field text-xs font-bold text-emerald-400 font-mono"
+                      placeholder="60000"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Down Payment (PKR) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={contractForm.downPayment}
+                      onChange={(e) => handleContractFormChange('downPayment', e.target.value)}
+                      className="input-field text-xs font-bold text-sky-400 font-mono"
+                      placeholder="15000"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Tenure (Months) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={48}
+                      value={contractForm.totalMonths}
+                      onChange={(e) => handleContractFormChange('totalMonths', e.target.value)}
+                      className="input-field text-xs font-bold text-indigo-400 font-mono"
+                      placeholder="6"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Monthly Installment (PKR)</label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      value={contractForm.monthlyInstallment}
+                      onChange={(e) => handleContractFormChange('monthlyInstallment', e.target.value)}
+                      className="input-field text-xs font-bold text-amber-400 font-mono"
+                      placeholder="7500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Due Day of Month (1-31)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={contractForm.dueDateDay}
+                      onChange={(e) => handleContractFormChange('dueDateDay', e.target.value)}
+                      className="input-field text-xs font-mono"
+                      placeholder="5"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Next Due Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={contractForm.nextDueDate}
+                      onChange={(e) => handleContractFormChange('nextDueDate', e.target.value)}
+                      className="input-field text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">Default Unlock PIN</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={contractForm.unlockPin}
+                      onChange={(e) => handleContractFormChange('unlockPin', e.target.value)}
+                      className="input-field text-xs font-mono text-center font-bold text-indigo-400"
+                      placeholder="1234"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Retailer Store Assignment (Visible to Super Admin or read-only) */}
+              <div className="space-y-2 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-teal-400" /> Assigned Store / Retailer
+                </label>
+                {role === 'SUPER_ADMIN' ? (
+                  <select
+                    value={contractForm.retailerId || 'RET-101'}
+                    onChange={(e) => handleContractFormChange('retailerId', e.target.value)}
+                    className="input-field text-xs"
+                  >
+                    {retailers.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.businessName} ({r.id}) - {r.city}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-xs text-slate-300 font-bold px-3 py-2 bg-slate-900 rounded-xl border border-slate-800">
+                    {sellerName} ({contractForm.retailerId || 'Your Store'})
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowContractModal(false)}
+                  className="btn-secondary text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContract}
+                  className="btn-primary bg-teal-600 hover:bg-teal-700 text-xs px-5 font-bold flex items-center gap-2"
+                >
+                  {savingContract ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" /> Save Installment Contract
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

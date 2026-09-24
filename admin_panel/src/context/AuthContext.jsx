@@ -301,21 +301,19 @@ export const AuthProvider = ({ children }) => {
 
   const filterScope =
     role === 'RETAILER'
-      ? (activeRetailer?.id || activeRetailerId || 'RET-101')
+      ? (currentUser?.retailerId || activeRetailer?.id || activeRetailerId || 'RET-101')
       : (activeRetailerId || 'SUPER_ADMIN');
 
-  const visibleDevices = (role === 'SUPER_ADMIN' || filterScope === 'ALL')
+  const visibleDevices = (role === 'SUPER_ADMIN' || filterScope === 'ALL' || filterScope === 'SUPER_ADMIN')
     ? devices
     : devices.filter((d) => {
-        if (!d.retailerId || d.retailerId === 'SUPER_ADMIN' || d.retailerId === 'RET-SUPER') return true;
-        return d.retailerId === filterScope || d.retailerId === activeRetailer?.id || d.retailerName === activeRetailer?.businessName;
+        return d.retailerId === filterScope || d.retailerId === activeRetailer?.id || (activeRetailer?.businessName && d.retailerName === activeRetailer.businessName);
       });
 
-  const visibleContracts = (role === 'SUPER_ADMIN' || filterScope === 'ALL')
+  const visibleContracts = (role === 'SUPER_ADMIN' || filterScope === 'ALL' || filterScope === 'SUPER_ADMIN')
     ? contracts
     : contracts.filter((c) => {
-        if (!c.retailerId || c.retailerId === 'SUPER_ADMIN' || c.retailerId === 'RET-SUPER') return true;
-        return c.retailerId === filterScope || c.retailerId === activeRetailer?.id || c.retailerName === activeRetailer?.businessName;
+        return c.retailerId === filterScope || c.retailerId === activeRetailer?.id || (activeRetailer?.businessName && c.retailerName === activeRetailer.businessName);
       });
 
   const visibleContractIds = visibleContracts.map((c) => c.contractId);

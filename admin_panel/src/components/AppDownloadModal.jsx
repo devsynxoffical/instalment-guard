@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, ExternalLink, RefreshCw } from 'lucide-react';
+import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, ExternalLink, RefreshCw, Building2 } from 'lucide-react';
 import { generateQRCodeDataUrl, generateQRCodeSVG } from '../utils/qrGenerator';
+import { useAuth } from '../context/AuthContext';
 
 export default function AppDownloadModal({ isOpen, onClose }) {
+  const { currentUser, role, activeRetailer } = useAuth();
+
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const currentHost = typeof window !== 'undefined' ? window.location.host : 'instalment-guard-production-8ff6.up.railway.app';
   const defaultHost = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -14,12 +17,20 @@ export default function AppDownloadModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
   const [qrDataUrl, setQrDataUrl] = useState('');
 
-  // Construct URL with proper scheme
+  // Retailer Scope
+  const effectiveRetailerId = role === 'RETAILER'
+    ? (currentUser?.retailerId || activeRetailer?.id || 'RET-101')
+    : (currentUser?.retailerId && currentUser.retailerId !== 'SUPER_ADMIN' ? currentUser.retailerId : null);
+
+  const retailerName = activeRetailer?.businessName || currentUser?.name || 'Retailer Store';
+
+  // Construct URL with proper scheme & retailer binding
   const baseUrl = serverHost.startsWith('http://') || serverHost.startsWith('https://')
     ? serverHost
     : `${isHttps || serverHost.includes('railway.app') ? 'https://' : 'http://'}${serverHost}`;
 
-  const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk`;
+  const retailerQuery = effectiveRetailerId ? `?retailerId=${encodeURIComponent(effectiveRetailerId)}` : '';
+  const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk${retailerQuery}`;
   const backendQrUrl = `/api/qr?text=${encodeURIComponent(apkUrl)}`;
 
   useEffect(() => {
@@ -132,6 +143,21 @@ export default function AppDownloadModal({ isOpen, onClose }) {
 
               {/* URL Customizer & Direct Buttons */}
               <div className="space-y-4">
+                {effectiveRetailerId && (
+                  <div className="p-3 rounded-2xl bg-teal-950/80 border border-teal-500/40 flex items-center justify-between text-xs shadow-inner">
+                    <div className="flex items-center gap-2 text-teal-300 font-bold">
+                      <Building2 className="w-4 h-4 text-teal-400 shrink-0" />
+                      <div>
+                        <div>{retailerName}</div>
+                        <div className="text-[10px] text-teal-400/80 font-normal">Devices will auto-bind to your store dashboard</div>
+                      </div>
+                    </div>
+                    <span className="font-mono px-2.5 py-1 rounded-lg bg-teal-900/90 border border-teal-700/50 text-teal-200 text-xs font-black tracking-wider">
+                      {effectiveRetailerId}
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                     Server Host / Cloud Domain
