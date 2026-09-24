@@ -414,6 +414,7 @@ export const AuthProvider = ({ children }) => {
       businessName: data.businessName,
       ownerName: data.ownerName,
       email: data.email,
+      password: data.password || 'Retailer@12345',
       phone: data.phone,
       address: data.address || '',
       city: data.city || 'Karachi',
