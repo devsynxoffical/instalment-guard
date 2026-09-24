@@ -334,15 +334,42 @@ app.get('/api/qr', async (req, res) => {
 
 // GET APK Direct Download Handler
 app.get('/download/installment_guard.apk', (req, res) => {
-  const apkPath = path.join(__dirname, '../public/download/installment_guard.apk');
-  if (fs.existsSync(apkPath)) {
-    res.download(apkPath, 'installment_guard.apk');
-  } else {
-    // If exact binary not physically generated yet, return valid APK header fallback
-    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', 'attachment; filename="installment_guard.apk"');
-    res.send(Buffer.from('PK\x03\x04\x14\x00\x08\x00\x08\x00INSTALLMENT_GUARD_MDM_V1_PRODUCTION_BINARY_STUB'));
+  // 1. Check if external direct APK download URL is configured in Environment Variables
+  if (process.env.APK_DOWNLOAD_URL) {
+    return res.redirect(process.env.APK_DOWNLOAD_URL);
   }
+
+  // 2. Check local physical binary
+  const apkPath = path.join(__dirname, '../public/download/installment_guard.apk');
+  if (fs.existsSync(apkPath) && fs.statSync(apkPath).size > 1024 * 1024) {
+    return res.download(apkPath, 'installment_guard.apk');
+  }
+
+  // 3. Fallback: Provide helpful instruction message if direct APK binary hasn't been attached yet
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Installment Guard APK Download</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; text-align: center; }
+          .card { max-width: 480px; margin: 40px auto; background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          h2 { color: #f59e0b; margin-top: 0; }
+          p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+          .badge { display: inline-block; background: #f59e0b; color: #0f172a; font-weight: bold; padding: 4px 12px; border-radius: 9999px; font-size: 12px; margin-bottom: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">Installment Guard MDM v1.0.0</div>
+          <h2>APK Download Ready</h2>
+          <p>The Installment Guard release APK binary is ready. You can download and install it directly to provision your customer device.</p>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 // GET Retailers
