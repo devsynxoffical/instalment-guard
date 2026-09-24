@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import QRCode from 'qrcode';
 import { store } from './store.js';
 
 import path from 'path';
@@ -308,6 +309,27 @@ app.get('/api/app/info', (req, res) => {
     downloadUrl: '/download/installment_guard.apk',
     timestamp: new Date().toISOString(),
   });
+});
+
+// GET Realtime Standard QR Code Image Generator
+app.get('/api/qr', async (req, res) => {
+  try {
+    const text = req.query.text || `${req.protocol}://${req.get('host')}/download/installment_guard.apk`;
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    await QRCode.toFileStream(res, text, {
+      width: 320,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+      errorCorrectionLevel: 'M',
+    });
+  } catch (err) {
+    console.error('QR generation error:', err);
+    res.status(500).send('Failed to generate QR code');
+  }
 });
 
 // GET APK Direct Download Handler

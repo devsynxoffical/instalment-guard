@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, ExternalLink, RefreshCw } from 'lucide-react';
-import { generateQRCodeSVG } from '../utils/qrGenerator';
+import { generateQRCodeDataUrl, generateQRCodeSVG } from '../utils/qrGenerator';
 
 export default function AppDownloadModal({ isOpen, onClose }) {
   const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
@@ -12,6 +12,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
   const [serverHost, setServerHost] = useState(defaultHost);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   // Construct URL with proper scheme
   const baseUrl = serverHost.startsWith('http://') || serverHost.startsWith('https://')
@@ -19,14 +20,23 @@ export default function AppDownloadModal({ isOpen, onClose }) {
     : `${isHttps || serverHost.includes('railway.app') ? 'https://' : 'http://'}${serverHost}`;
 
   const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk`;
+  const backendQrUrl = `/api/qr?text=${encodeURIComponent(apkUrl)}`;
 
-  const qrSvg = generateQRCodeSVG(apkUrl, {
-    size: 240,
-    bgColor: '#FFFFFF',
-    fgColor: '#0F172A',
-    moduleColor: '#0F172A',
-    cornerColor: '#D97706',
-  });
+  useEffect(() => {
+    let isMounted = true;
+    generateQRCodeDataUrl(apkUrl, {
+      size: 320,
+      bgColor: '#FFFFFF',
+      fgColor: '#000000',
+    }).then((url) => {
+      if (isMounted) {
+        setQrDataUrl(url || backendQrUrl);
+      }
+    }).catch(() => {
+      if (isMounted) setQrDataUrl(backendQrUrl);
+    });
+    return () => { isMounted = false; };
+  }, [apkUrl, backendQrUrl]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(apkUrl);
@@ -99,10 +109,21 @@ export default function AppDownloadModal({ isOpen, onClose }) {
               {/* QR Code Container */}
               <div className="flex flex-col items-center justify-center p-5 bg-slate-950/60 rounded-2xl border border-slate-800 shadow-inner">
                 <div 
-                  className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer"
-                  dangerouslySetInnerHTML={{ __html: qrSvg }}
+                  className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer flex items-center justify-center min-w-[240px] min-h-[240px]"
                   title="Scan with phone camera or QR Reader"
-                />
+                >
+                  {qrDataUrl ? (
+                    <img 
+                      src={qrDataUrl} 
+                      alt="Installment Guard APK Download QR" 
+                      className="w-[230px] h-[230px] object-contain rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-[230px] h-[230px] flex items-center justify-center text-slate-400 text-xs">
+                      Generating standard QR Code...
+                    </div>
+                  )}
+                </div>
                 <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5">
                   <Wifi className="w-3.5 h-3.5 text-amber-400" />
                   Scan with Android Camera / QR App
