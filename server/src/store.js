@@ -904,6 +904,19 @@ class DataStore {
     return null;
   }
 
+  async deleteRetailer(retailerId, performer = 'Super Admin') {
+    await this.initDb();
+    const ret = await RetailerModel.findByPk(retailerId);
+    if (ret) {
+      const name = ret.businessName;
+      await ret.destroy();
+      await UserModel.destroy({ where: { retailerId } });
+      await this.addAuditLog(performer, 'SUPER_ADMIN', 'RETAILER_DELETED', `${name} (${retailerId})`, `Deleted retailer and associated login credentials`);
+      return true;
+    }
+    return false;
+  }
+
   async addCommand(command) {
     await this.initDb();
     const newCmd = await AdminCommandModel.create({

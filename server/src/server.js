@@ -401,6 +401,22 @@ app.post('/api/retailers', async (req, res) => {
   }
 });
 
+// DELETE Retailer
+app.delete('/api/retailers/:retailerId', async (req, res) => {
+  try {
+    const { retailerId } = req.params;
+    const { performerName } = req.body || {};
+    const success = await store.deleteRetailer(retailerId, performerName);
+    if (success) {
+      res.json({ success: true, message: 'Retailer deleted successfully' });
+    } else {
+      res.status(404).json({ success: false, message: 'Retailer not found' });
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // GET Devices
 app.get('/api/devices', async (req, res) => {
   try {
