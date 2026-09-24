@@ -263,10 +263,16 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    dpm.setKeyguardDisabledFeatures(
-                        adminComponent,
-                        DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL
-                    )
+                    try {
+                        dpm.setKeyguardDisabledFeatures(
+                            adminComponent,
+                            DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL
+                        )
+                        dpm.setStatusBarDisabled(adminComponent, true)
+                        Log.i(TAG, "Status bar dropdown & Keyguard features completely disabled for lockdown.")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to disable status bar or keyguard: ${e.message}")
+                    }
                 }
 
                 if (!wasRestricted) {
@@ -283,10 +289,16 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
                 Log.i(TAG, "Removing supported device restriction mode...")
                 dpm.setLockTaskPackages(adminComponent, arrayOf())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    dpm.setKeyguardDisabledFeatures(
-                        adminComponent,
-                        DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE
-                    )
+                    try {
+                        dpm.setKeyguardDisabledFeatures(
+                            adminComponent,
+                            DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE
+                        )
+                        dpm.setStatusBarDisabled(adminComponent, false)
+                        Log.i(TAG, "Status bar dropdown & Keyguard features restored.")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to restore status bar or keyguard: ${e.message}")
+                    }
                 }
 
                 activity?.runOnUiThread {

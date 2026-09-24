@@ -134,8 +134,10 @@ class RestrictionForegroundService : Service() {
                 val responseStr = reader.use { it.readText() }
                 val responseJson = JSONObject(responseStr)
 
+                // Record successful online heartbeat timestamp
+                prefs.edit().putLong("last_successful_online_checkin", System.currentTimeMillis()).apply()
+
                 val isRestrictedServer = responseJson.optBoolean("isRestricted", false)
-                val prefs = getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
                 val currentlyRestricted = prefs.getBoolean("is_device_restricted", false)
 
                 var shouldRestrict = isRestrictedServer
@@ -167,10 +169,33 @@ class RestrictionForegroundService : Service() {
                 } else if (shouldRestrict) {
                     bringAppToFrontAndLock()
                 }
+            } else {
+                checkOfflineDeadmanSwitch(policyService, prefs)
             }
             conn.disconnect()
         } catch (e: Exception) {
-            // Silently handle offline network conditions in background loop
+            // Silently handle offline network conditions and evaluate Deadman Switch
+            try {
+                val policyService = DevicePolicyService(this)
+                val prefs = getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
+                checkOfflineDeadmanSwitch(policyService, prefs)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun checkOfflineDeadmanSwitch(policyService: DevicePolicyService, prefs: android.content.SharedPreferences) {
+        try {
+            val lastOnline = prefs.getLong("last_successful_online_checkin", System.currentTimeMillis())
+            val offlineHours = (System.currentTimeMillis() - lastOnline) / (1000L * 60 * 60)
+            val maxOfflineGraceHours = prefs.getInt("max_offline_grace_hours", 72) // 72 hours max offline grace period
+
+            if (offlineHours >= maxOfflineGraceHours && !policyService.isDeviceRestricted()) {
+                Log.w(TAG, "Deadman Switch Triggered: Device has been offline for $offlineHours hours. Autonomously applying lock.")
+                policyService.applyDeviceRestriction(true)
+                bringAppToFrontAndLock()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in checkOfflineDeadmanSwitch: ${e.message}")
         }
     }
 
