@@ -82,18 +82,20 @@ class NodeJsBackendService implements BackendService {
     await prefs.setString(AppConstants.keyContractId, device.contractId);
     await prefs.setString(AppConstants.keyDeviceStatus, device.deviceStatus);
 
+    final savedRetailerId = prefs.getString('saved_retailer_id') ?? (device.retailerId.isNotEmpty ? device.retailerId : null);
+
     final payload = {
       'deviceId': device.deviceId,
-      'retailerId': 'RET-101', // Default assigned retailer
+      if (savedRetailerId != null && savedRetailerId.isNotEmpty) 'retailerId': savedRetailerId,
       'enrollmentData': {
-        'customerName': device.customerId,
-        'customerPhone': '+92 300 1234567',
+        'customerName': device.customerId.isNotEmpty ? device.customerId : 'Customer',
+        'customerPhone': '',
         'manufacturer': device.manufacturer,
         'model': device.model,
         'imei': device.imei,
-        'totalPrice': 60000,
-        'downPayment': 15000,
-        'monthlyInstallment': 5000,
+        'totalPrice': 0,
+        'downPayment': 0,
+        'monthlyInstallment': 0,
       }
     };
 
