@@ -8,13 +8,13 @@ export const EnrollDeviceModal = ({ onClose }) => {
     customerName: '',
     customerCnic: '',
     customerPhone: '',
-    manufacturer: 'Realme',
-    brand: 'Realme',
-    model: 'RMX3830 (C53)',
-    imei: '864293048571029',
-    totalPrice: '45000',
-    downPayment: '10000',
-    monthlyInstallment: '5000',
+    manufacturer: '',
+    brand: '',
+    model: '',
+    imei: '',
+    totalPrice: '',
+    downPayment: '',
+    monthlyInstallment: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

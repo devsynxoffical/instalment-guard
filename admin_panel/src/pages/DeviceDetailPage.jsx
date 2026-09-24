@@ -90,10 +90,10 @@ export const DeviceDetailPage = () => {
     customerName: '',
     customerPhone: '',
     customerCnic: '',
-    totalPrice: 60000,
-    downPayment: 15000,
+    totalPrice: 0,
+    downPayment: 0,
     totalMonths: 6,
-    monthlyInstallment: 7500,
+    monthlyInstallment: 0,
     dueDateDay: 5,
     nextDueDate: '',
     unlockPin: '1234',
@@ -101,17 +101,19 @@ export const DeviceDetailPage = () => {
   });
 
   const openContractModal = () => {
-    const defaultTotal = contract.totalPrice || device?.totalPrice || 60000;
-    const defaultDown = contract.downPayment || device?.downPayment || 15000;
+    const defaultTotal = contract.totalPrice !== undefined && contract.totalPrice !== null ? contract.totalPrice : (device?.totalPrice ?? 0);
+    const defaultDown = contract.downPayment !== undefined && contract.downPayment !== null ? contract.downPayment : (device?.downPayment ?? 0);
     const defaultMonths = contract.totalMonths || 6;
     const defaultRemaining = Math.max(0, defaultTotal - defaultDown);
-    const defaultMonthly = contract.monthlyInstallment || (defaultMonths > 0 ? Math.round(defaultRemaining / defaultMonths) : defaultRemaining);
+    const defaultMonthly = contract.monthlyInstallment !== undefined && contract.monthlyInstallment !== null
+      ? contract.monthlyInstallment
+      : (defaultMonths > 0 ? Math.round(defaultRemaining / defaultMonths) : defaultRemaining);
 
     setContractForm({
-      customerName: contract.customerName || device?.customerName || 'Customer',
-      customerPhone: contract.customerPhone || device?.customerPhone || '+92 300 1234567',
-      customerCnic: contract.customerCnic || device?.customerCnic || '42101-1234567-1',
-      retailerId: device?.retailerId || contract.retailerId || currentUser?.retailerId || 'RET-101',
+      customerName: contract.customerName || device?.customerName || '',
+      customerPhone: contract.customerPhone || device?.customerPhone || '',
+      customerCnic: contract.customerCnic || device?.customerCnic || '',
+      retailerId: device?.retailerId || contract.retailerId || currentUser?.retailerId || '',
       totalPrice: defaultTotal,
       downPayment: defaultDown,
       totalMonths: defaultMonths,
