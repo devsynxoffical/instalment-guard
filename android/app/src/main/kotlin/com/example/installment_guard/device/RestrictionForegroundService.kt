@@ -109,7 +109,13 @@ class RestrictionForegroundService : Service() {
             val deviceId = devInfo["deviceId"]?.toString() ?: return
 
             // Native HTTP call to live Node.js REST API
-            val serverUrl = "http://10.0.2.2:5000/api/devices/$deviceId/telemetry"
+            val prefs = getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
+            val custom = prefs.getString("custom_server_ip", null)
+            val baseServer = when {
+                !custom.isNullOrBlank() -> if (custom.endsWith("/api")) custom else "$custom/api"
+                else -> "https://instalment-guard-production-8ff6.up.railway.app/api"
+            }
+            val serverUrl = "$baseServer/devices/$deviceId/telemetry"
             val url = URL(serverUrl)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"

@@ -3,17 +3,23 @@ import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, Extern
 import { generateQRCodeSVG } from '../utils/qrGenerator';
 
 export default function AppDownloadModal({ isOpen, onClose }) {
-  // Auto-detect current host address or default to LAN IP
-  const defaultHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? '10.10.20.33'
-    : window.location.hostname;
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const currentHost = typeof window !== 'undefined' ? window.location.host : 'instalment-guard-production-8ff6.up.railway.app';
+  const defaultHost = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'instalment-guard-production-8ff6.up.railway.app'
+    : currentHost;
 
   const [serverHost, setServerHost] = useState(defaultHost);
-  const [serverPort, setServerPort] = useState('5000');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
 
-  const apkUrl = `http://${serverHost}:${serverPort}/download/installment_guard.apk`;
+  // Construct URL with proper scheme
+  const baseUrl = serverHost.startsWith('http://') || serverHost.startsWith('https://')
+    ? serverHost
+    : `${isHttps || serverHost.includes('railway.app') ? 'https://' : 'http://'}${serverHost}`;
+
+  const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk`;
+
   const qrSvg = generateQRCodeSVG(apkUrl, {
     size: 240,
     bgColor: '#FFFFFF',
@@ -107,26 +113,19 @@ export default function AppDownloadModal({ isOpen, onClose }) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Server IP / Host Customizer
+                    Server Host / Cloud Domain
                   </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={serverHost}
                       onChange={(e) => setServerHost(e.target.value)}
-                      placeholder="e.g. 10.10.20.33 or domain.com"
+                      placeholder="e.g. instalment-guard-production-8ff6.up.railway.app"
                       className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-400 transition-colors font-mono"
-                    />
-                    <input
-                      type="text"
-                      value={serverPort}
-                      onChange={(e) => setServerPort(e.target.value)}
-                      placeholder="5000"
-                      className="w-20 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-400 transition-colors font-mono text-center"
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Change IP to match your local Wi-Fi or server IP so phones can connect.
+                    Points to live cloud backend. Mobile app automatically checks in with this server.
                   </p>
                 </div>
 

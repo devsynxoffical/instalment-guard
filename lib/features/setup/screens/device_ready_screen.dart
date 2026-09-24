@@ -81,18 +81,18 @@ class _DeviceReadyScreenState extends State<DeviceReadyScreen> {
   }
 
   void _showSetServerIpDialog() {
-    final controller = TextEditingController(text: 'http://10.10.20.33:5000');
+    final controller = TextEditingController(text: 'https://instalment-guard-production-8ff6.up.railway.app');
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1E293B),
-          title: const Text('Node.js Server IP Address', style: TextStyle(color: Colors.white)),
+          title: const Text('Backend Server URL', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Enter PC LAN IP Address running Node.js Server (e.g. http://10.10.20.33:5000 or http://192.168.1.50:5000).',
+                'Enter Cloud Server or Local LAN URL (e.g. https://instalment-guard-production-8ff6.up.railway.app or http://10.10.20.33:5000).',
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -399,7 +399,7 @@ class _DeviceReadyScreenState extends State<DeviceReadyScreen> {
                       ListTile(
                         leading: const Icon(Icons.wifi_tethering, color: AppTheme.accentCyan),
                         title: const Text('Configure Live Server Connection URL', style: TextStyle(color: Colors.white)),
-                        subtitle: const Text('Default: http://10.10.20.33:5000', style: TextStyle(color: Color(0xFF94A3B8))),
+                        subtitle: const Text('Default: https://instalment-guard-production-8ff6.up.railway.app', style: TextStyle(color: Color(0xFF94A3B8))),
                         onTap: () {
                           Navigator.pop(sheetContext);
                           _showSetServerIpDialog();

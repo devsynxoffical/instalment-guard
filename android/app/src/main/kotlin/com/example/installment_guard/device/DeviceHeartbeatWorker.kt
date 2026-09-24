@@ -21,7 +21,7 @@ class DeviceHeartbeatWorker(
     companion object {
         private const val TAG = "DeviceHeartbeatWorker"
         const val WORK_NAME = "InstallmentGuardHeartbeatWorker"
-        private const val DEFAULT_SERVER_URL = "http://10.10.20.33:5000/api"
+        private const val DEFAULT_SERVER_URL = "https://instalment-guard-production-8ff6.up.railway.app/api"
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -51,7 +51,13 @@ class DeviceHeartbeatWorker(
 
     private fun syncNativeHeartbeat(policyService: DevicePolicyService, deviceId: String, deviceData: Map<String, Any>) {
         try {
-            val serverUrlStr = "$DEFAULT_SERVER_URL/devices/$deviceId/telemetry"
+            val prefs = applicationContext.getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
+            val custom = prefs.getString("custom_server_ip", null)
+            val baseServer = when {
+                !custom.isNullOrBlank() -> if (custom.endsWith("/api")) custom else "$custom/api"
+                else -> DEFAULT_SERVER_URL
+            }
+            val serverUrlStr = "$baseServer/devices/$deviceId/telemetry"
             val url = URL(serverUrlStr)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"

@@ -51,12 +51,16 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
         }
 
         try {
+            // Strict Anti-Tamper and Anti-Factory Reset Restrictions
             addUserRestriction(UserManager.DISALLOW_FACTORY_RESET)
-            addUserRestriction(UserManager.DISALLOW_ADD_USER)
             addUserRestriction(UserManager.DISALLOW_SAFE_BOOT)
+            addUserRestriction(UserManager.DISALLOW_ADD_USER)
             addUserRestriction(UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA)
             addUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS)
             addUserRestriction(UserManager.DISALLOW_APPS_CONTROL)
+            addUserRestriction(UserManager.DISALLOW_DEBUGGING_FEATURES)
+            addUserRestriction(UserManager.DISALLOW_CONFIG_DATE_TIME)
+            addUserRestriction(UserManager.DISALLOW_NETWORK_RESET)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {

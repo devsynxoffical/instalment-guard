@@ -15,8 +15,8 @@ class NodeJsBackendService implements BackendService {
   factory NodeJsBackendService() => _instance;
   NodeJsBackendService._internal();
 
-  // Host configuration: 10.10.20.33 for LAN Wi-Fi real devices, 10.0.2.2 for Android Emulator
-  String _baseUrl = 'http://10.10.20.33:5000/api';
+  // Production Railway Backend URL as primary default
+  String _baseUrl = 'https://instalment-guard-production-8ff6.up.railway.app/api';
   final DeviceManagementService _deviceService = DeviceManagementService();
 
   void setBaseUrl(String url) {
@@ -31,10 +31,12 @@ class NodeJsBackendService implements BackendService {
       urls.add(custom.endsWith('/api') ? custom : '$custom/api');
     }
     urls.add(_baseUrl);
+    urls.add('https://instalment-guard-production-8ff6.up.railway.app/api');
+    urls.add('http://10.10.20.33:5000/api');
+    urls.add('http://10.0.2.2:5000/api');
     urls.add('http://127.0.0.1:5000/api');
     urls.add('http://localhost:5000/api');
-    urls.add('http://10.0.2.2:5000/api');
-    return urls;
+    return urls.toSet().toList();
   }
 
   Future<dynamic> _httpGet(String path) async {
