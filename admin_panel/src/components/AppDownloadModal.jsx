@@ -38,9 +38,10 @@ export default function AppDownloadModal({ isOpen, onClose }) {
   const dpcProvisioningPayload = JSON.stringify({
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.example.installment_guard/com.example.installment_guard.device.InstallmentAdminReceiver",
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": apkUrl,
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "PtPdqGxf8LVeElfVwNVi4SIMZ2thmrCwPOBFgQBqmeY",
     "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
     "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
-      "retailerId": effectiveRetailerId || "RET-101",
+      "retailerId": effectiveRetailerId || "RET-862",
       "serverUrl": `${baseUrl.replace(/\/+$/, '')}/api`
     }
   });
