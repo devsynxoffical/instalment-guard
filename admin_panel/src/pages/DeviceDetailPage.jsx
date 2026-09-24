@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { deviceService } from '../services/deviceService';
 
+import { API_BASE_URL } from '../config/api';
+
 export const DeviceDetailPage = () => {
   const { deviceId } = useParams();
   const navigate = useNavigate();
@@ -45,7 +47,7 @@ export const DeviceDetailPage = () => {
     if (!deviceId) return;
     const fetchLive = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/devices/${deviceId}`);
+        const res = await fetch(`${API_BASE_URL}/api/devices/${encodeURIComponent(deviceId)}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {

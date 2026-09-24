@@ -1,10 +1,22 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../db.js';
 
+export const UserModel = sequelize.define('User', {
+  id: { type: DataTypes.STRING, primaryKey: true },
+  email: { type: DataTypes.STRING, allowNull: false, unique: true },
+  password: { type: DataTypes.STRING, allowNull: false },
+  name: { type: DataTypes.STRING, defaultValue: '' },
+  role: { type: DataTypes.STRING, defaultValue: 'RETAILER' }, // 'SUPER_ADMIN' | 'RETAILER'
+  retailerId: { type: DataTypes.STRING, defaultValue: null },
+  status: { type: DataTypes.STRING, defaultValue: 'ACTIVE' }, // 'ACTIVE' | 'SUSPENDED'
+  phone: { type: DataTypes.STRING, defaultValue: '' },
+}, { timestamps: true });
+
 export const RetailerModel = sequelize.define('Retailer', {
   id: { type: DataTypes.STRING, primaryKey: true },
   businessName: { type: DataTypes.STRING, allowNull: false },
   ownerName: { type: DataTypes.STRING, defaultValue: '' },
+  email: { type: DataTypes.STRING, defaultValue: '' },
   phone: { type: DataTypes.STRING, defaultValue: '' },
   city: { type: DataTypes.STRING, defaultValue: 'Lahore' },
   address: { type: DataTypes.TEXT, defaultValue: '' },

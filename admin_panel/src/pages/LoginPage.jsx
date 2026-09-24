@@ -39,9 +39,9 @@ export const LoginPage = () => {
       showToast('Authentication successful! Welcome to Dashboard.', 'success');
       navigate('/dashboard');
     } catch (err) {
-      console.warn('Login fallback activated:', err);
-      showToast('Authenticated (Demo Active Session)', 'success');
-      navigate('/dashboard');
+      const msg = err.message || 'Invalid email or password. Please check your credentials.';
+      setErrorMsg(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }

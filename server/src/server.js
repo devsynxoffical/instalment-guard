@@ -3,6 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import { store } from './store.js';
 
 import path from 'path';
@@ -16,9 +17,28 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'installment_guard_jwt_secret_key_2026_super_secure';
 
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
+
+// Auth Token Verification Middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader);
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Access denied: Authentication token required.' });
+  }
+
+  try {
+    const verified = jwt.verify(token, JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (err) {
+    return res.status(403).json({ success: false, message: 'Invalid or expired authentication token.' });
+  }
+};
 
 // Static download directory for APK files & assets
 const downloadDir = path.join(__dirname, '../public/download');
@@ -56,6 +76,201 @@ function broadcastDeviceUpdate(device) {
     io.to(`retailer_${device.retailerId}`).emit('retailer_device_updated', device);
   }
 }
+
+// ----------------------------------------------------
+// AUTHENTICATION & USER MANAGEMENT ROUTES
+// ----------------------------------------------------
+
+// POST User Login (Super Admin & Retailer)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    }
+
+    const user = await store.verifyUserPassword(email, password);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password. Please check your credentials.' });
+    }
+
+    if (user.status === 'SUSPENDED') {
+      return res.status(403).json({ success: false, message: 'Your account has been suspended. Please contact Super Admin HQ.' });
+    }
+
+    // Attach retailer metadata if retailer user
+    let retailerData = null;
+    if (user.role === 'RETAILER' && user.retailerId) {
+      retailerData = await store.getRetailerById(user.retailerId);
+      if (retailerData && retailerData.status === 'SUSPENDED') {
+        return res.status(403).json({ success: false, message: 'Your store has been suspended by Super Admin.' });
+      }
+    }
+
+    const payload = {
+      uid: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      retailerId: user.retailerId || (user.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : null),
+      status: user.status,
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+    const userProfile = {
+      ...payload,
+      businessName: retailerData ? retailerData.businessName : (user.role === 'SUPER_ADMIN' ? 'Super Admin HQ' : user.name),
+      credits: retailerData ? retailerData.credits : (user.role === 'SUPER_ADMIN' ? 999999 : 0),
+      phone: user.phone || (retailerData ? retailerData.phone : ''),
+    };
+
+    await store.addAuditLog(user.name || user.email, user.role, 'USER_LOGIN', user.email, `Logged in successfully from Admin Web Portal.`);
+
+    res.json({
+      success: true,
+      message: 'Authentication successful',
+      token,
+      user: userProfile,
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ success: false, message: `Server error during login: ${err.message}` });
+  }
+});
+
+// GET Current Authenticated User Session Profile
+app.get('/api/auth/me', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader);
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'No authentication token provided.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await store.findUserById(decoded.uid);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    if (user.status === 'SUSPENDED') {
+      return res.status(403).json({ success: false, message: 'Account is suspended.' });
+    }
+
+    let retailerData = null;
+    if (user.role === 'RETAILER' && user.retailerId) {
+      retailerData = await store.getRetailerById(user.retailerId);
+    }
+
+    const userProfile = {
+      uid: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      retailerId: user.retailerId || (user.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : null),
+      status: user.status,
+      businessName: retailerData ? retailerData.businessName : (user.role === 'SUPER_ADMIN' ? 'Super Admin HQ' : user.name),
+      credits: retailerData ? retailerData.credits : (user.role === 'SUPER_ADMIN' ? 999999 : 0),
+      phone: user.phone || (retailerData ? retailerData.phone : ''),
+    };
+
+    res.json({ success: true, user: userProfile });
+  } catch (err) {
+    res.status(401).json({ success: false, message: 'Invalid or expired session token.' });
+  }
+});
+
+// POST Register New Retailer Account (Public Sign Up or Store Onboarding)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, businessName, ownerName, phone, city, address } = req.body;
+    if (!email || !password || !businessName) {
+      return res.status(400).json({ success: false, message: 'Business name, email, and password are required.' });
+    }
+
+    const existingUser = await store.findUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists. Please log in.' });
+    }
+
+    const retailerId = `RET-${Math.floor(100 + Math.random() * 900)}`;
+    const retailer = await store.addRetailer({
+      id: retailerId,
+      businessName,
+      ownerName: ownerName || businessName,
+      email,
+      password,
+      phone: phone || '',
+      city: city || 'Karachi',
+      address: address || '',
+      credits: 10, // Initial gift credits for new store signup
+      status: 'ACTIVE',
+    });
+
+    const user = await store.verifyUserPassword(email, password);
+    const token = jwt.sign(
+      {
+        uid: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        retailerId: user.retailerId,
+        status: user.status,
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    await store.addAuditLog(ownerName || businessName, 'RETAILER', 'RETAILER_REGISTERED', businessName, `Self-registered new retailer account.`);
+
+    res.json({
+      success: true,
+      message: 'Retailer account registered successfully.',
+      token,
+      user: {
+        uid: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        retailerId,
+        businessName,
+        credits: retailer.credits,
+        status: 'ACTIVE',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST Change User Password
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'User ID, current password, and new password are required.' });
+    }
+
+    const user = await store.findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const verified = await store.verifyUserPassword(user.email, currentPassword);
+    if (!verified) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
+    }
+
+    await store.updateUserPassword(userId, newPassword);
+    await store.addAuditLog(user.name, user.role, 'PASSWORD_CHANGED', user.email, `Password updated successfully.`);
+
+    res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ----------------------------------------------------
 // REST API ROUTES
@@ -565,6 +780,18 @@ app.all('/api/system/reset', async (req, res) => {
     res.status(500).json({ success: false, message: e.message });
   }
 });
+
+// Serve Frontend Admin Panel Static Build (For Unified 1-Click Cloud Deployment)
+const clientDistPath = path.join(__dirname, '../../admin_panel/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/download') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 // Start Server
 server.listen(PORT, async () => {

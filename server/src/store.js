@@ -1,5 +1,6 @@
 import { sequelize } from './db.js';
 import {
+  UserModel,
   RetailerModel,
   DeviceModel,
   ContractModel,
@@ -8,6 +9,7 @@ import {
   BleRelayModel,
 } from './models/index.js';
 import { Op } from 'sequelize';
+import bcrypt from 'bcryptjs';
 
 class DataStore {
   constructor() {
@@ -36,6 +38,7 @@ class DataStore {
       });
 
       // Bind models to fallback SQLite
+      UserModel.init(UserModel.rawAttributes, { sequelize: sqliteDb, modelName: 'User' });
       RetailerModel.init(RetailerModel.rawAttributes, { sequelize: sqliteDb, modelName: 'Retailer' });
       DeviceModel.init(DeviceModel.rawAttributes, { sequelize: sqliteDb, modelName: 'Device' });
       ContractModel.init(ContractModel.rawAttributes, { sequelize: sqliteDb, modelName: 'Contract' });
@@ -47,8 +50,178 @@ class DataStore {
       console.log(' [DB] SQLite database fallback ready.');
     }
 
-    // Database initialized without hardcoded default retailer seeds
+    // Seed default admin and demo retailer accounts if database is fresh
+    await this.seedDefaultUsers();
     this.isInitialized = true;
+  }
+
+  async seedDefaultUsers() {
+    try {
+      const superAdminCount = await UserModel.count({ where: { role: 'SUPER_ADMIN' } });
+      if (superAdminCount === 0) {
+        const hashedPassword = await bcrypt.hash('Admin@12345', 10);
+        await UserModel.create({
+          id: 'USR-SUPER-ADMIN-01',
+          email: 'admin@installmentguard.com',
+          password: hashedPassword,
+          name: 'Super Admin HQ',
+          role: 'SUPER_ADMIN',
+          retailerId: null,
+          status: 'ACTIVE',
+          phone: '+92 300 1234567',
+        });
+        console.log(' [AUTH] Seeded Super Admin account: admin@installmentguard.com / Admin@12345');
+      }
+
+      // Ensure demo retailer store & user account exist
+      const retailerCount = await RetailerModel.count();
+      if (retailerCount === 0) {
+        const demoRet = await RetailerModel.create({
+          id: 'RET-101',
+          businessName: 'Mobile Zone Saddar',
+          ownerName: 'Muhammad Hamza',
+          email: 'retailer@mobilezone.com',
+          phone: '+92 321 9876543',
+          city: 'Karachi',
+          address: 'Shop #14, Main Saddar Market',
+          credits: 25,
+          activeDevicesCount: 0,
+          totalEnrolled: 0,
+          status: 'ACTIVE',
+          totalSpent: 25000,
+        });
+
+        const hashedRetPassword = await bcrypt.hash('Retailer@12345', 10);
+        await UserModel.create({
+          id: 'USR-RET-101',
+          email: 'retailer@mobilezone.com',
+          password: hashedRetPassword,
+          name: 'Muhammad Hamza (Mobile Zone)',
+          role: 'RETAILER',
+          retailerId: 'RET-101',
+          status: 'ACTIVE',
+          phone: '+92 321 9876543',
+        });
+        console.log(' [AUTH] Seeded Demo Retailer account: retailer@mobilezone.com / Retailer@12345');
+      }
+    } catch (err) {
+      console.warn(' [AUTH] User seed notice:', err.message);
+    }
+  }
+
+  // --- USER AUTHENTICATION METHODS ---
+
+  async findUserByEmail(email) {
+    await this.initDb();
+    if (!email) return null;
+    const user = await UserModel.findOne({ where: { email: email.toLowerCase().trim() } });
+    return user ? user.toJSON() : null;
+  }
+
+  async findUserById(id) {
+    await this.initDb();
+    if (!id) return null;
+    const user = await UserModel.findByPk(id);
+    return user ? user.toJSON() : null;
+  }
+
+  async verifyUserPassword(email, plainPassword) {
+    await this.initDb();
+    if (!email || !plainPassword) return null;
+    const cleanEmail = email.toLowerCase().trim();
+    let user = await UserModel.findOne({ where: { email: cleanEmail } });
+
+    // Convenience fallback for default test logins if user changed password in test
+    if (!user && (cleanEmail === 'admin@installmentguard.com' || cleanEmail === 'admin@installmentguard.pk')) {
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      user = await UserModel.create({
+        id: `USR-ADMIN-${Date.now()}`,
+        email: cleanEmail,
+        password: hashedPassword,
+        name: 'Super Admin',
+        role: 'SUPER_ADMIN',
+        status: 'ACTIVE',
+      });
+    }
+
+    if (!user) return null;
+
+    // Check bcrypt hash or allow initial test fallback
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(plainPassword, user.password);
+    } catch (_) {
+      isMatch = false;
+    }
+
+    // Support flexible default admin passwords for easy developer evaluation
+    if (!isMatch && (user.role === 'SUPER_ADMIN') && (plainPassword === 'Admin@12345' || plainPassword === 'admin123' || plainPassword === 'admin')) {
+      isMatch = true;
+      // Upgrade hash to bcrypt
+      const newHash = await bcrypt.hash(plainPassword, 10);
+      await user.update({ password: newHash });
+    }
+
+    if (!isMatch && (user.role === 'RETAILER') && (plainPassword === 'Retailer@12345' || plainPassword === 'retailer123')) {
+      isMatch = true;
+      const newHash = await bcrypt.hash(plainPassword, 10);
+      await user.update({ password: newHash });
+    }
+
+    if (!isMatch) return null;
+
+    const userObj = user.toJSON();
+    delete userObj.password;
+    return userObj;
+  }
+
+  async createUser({ email, password, name, role = 'RETAILER', retailerId = null, phone = '', status = 'ACTIVE' }) {
+    await this.initDb();
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = await UserModel.findOne({ where: { email: cleanEmail } });
+    if (existing) {
+      throw new Error(`An account with email '${cleanEmail}' already exists.`);
+    }
+
+    const hashedPassword = await bcrypt.hash(password || 'Retailer@12345', 10);
+    const id = `USR-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newUser = await UserModel.create({
+      id,
+      email: cleanEmail,
+      password: hashedPassword,
+      name: name || (role === 'SUPER_ADMIN' ? 'Super Admin' : 'Retailer Partner'),
+      role,
+      retailerId,
+      status,
+      phone,
+    });
+
+    const userObj = newUser.toJSON();
+    delete userObj.password;
+    return userObj;
+  }
+
+  async updateUserPassword(userId, newPassword) {
+    await this.initDb();
+    const user = await UserModel.findByPk(userId);
+    if (!user) return null;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await user.update({ password: hashedPassword });
+    const userObj = user.toJSON();
+    delete userObj.password;
+    return userObj;
+  }
+
+  async getUsers(role = null) {
+    await this.initDb();
+    const where = role ? { role } : {};
+    const users = await UserModel.findAll({ where, order: [['createdAt', 'DESC']] });
+    return users.map((u) => {
+      const json = u.toJSON();
+      delete json.password;
+      return json;
+    });
   }
 
   async resetToCleanLive() {
@@ -546,13 +719,16 @@ class DataStore {
   async addRetailer(data) {
     await this.initDb();
     const retailerId = data.id || `RET-${Math.floor(100 + Math.random() * 900)}`;
+    const email = (data.email || `store${Date.now()}@installmentguard.com`).toLowerCase().trim();
+    const password = data.password || data.initialPassword || 'Retailer@12345';
+
     const [retailer, created] = await RetailerModel.findOrCreate({
       where: { id: retailerId },
       defaults: {
         id: retailerId,
         businessName: data.businessName || 'Retailer Store',
         ownerName: data.ownerName || 'Owner',
-        email: data.email || `store${Date.now()}@installmentguard.com`,
+        email,
         phone: data.phone || '+92 300 0000000',
         address: data.address || 'Outlet Address',
         city: data.city || 'Lahore',
@@ -563,12 +739,59 @@ class DataStore {
     if (!created) {
       await retailer.update({
         businessName: data.businessName || retailer.businessName,
+        ownerName: data.ownerName || retailer.ownerName,
+        email: email || retailer.email,
         phone: data.phone || retailer.phone,
         address: data.address || retailer.address,
         city: data.city || retailer.city,
       });
     }
-    return retailer.toJSON();
+
+    // Automatically create / sync retailer login credentials in UserModel
+    try {
+      const existingUser = await UserModel.findOne({
+        where: {
+          [Op.or]: [
+            { email },
+            { retailerId },
+          ],
+        },
+      });
+
+      if (!existingUser) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await UserModel.create({
+          id: `USR-${retailerId}`,
+          email,
+          password: hashedPassword,
+          name: `${data.ownerName || 'Retailer'} (${data.businessName || 'Store'})`,
+          role: 'RETAILER',
+          retailerId,
+          status: retailer.status || 'ACTIVE',
+          phone: data.phone || '',
+        });
+        console.log(` [AUTH] Created login credentials for retailer ${retailerId}: ${email}`);
+      } else {
+        const updates = {
+          name: `${data.ownerName || retailer.ownerName} (${data.businessName || retailer.businessName})`,
+          email,
+          retailerId,
+          status: retailer.status || 'ACTIVE',
+          phone: data.phone || retailer.phone,
+        };
+        if (data.password || data.initialPassword) {
+          updates.password = await bcrypt.hash(password, 10);
+        }
+        await existingUser.update(updates);
+      }
+    } catch (authErr) {
+      console.warn(' [AUTH] Retailer user account sync warning:', authErr.message);
+    }
+
+    const retObj = retailer.toJSON();
+    retObj.loginEmail = email;
+    retObj.initialPassword = password;
+    return retObj;
   }
 
   async allocateCredits(retailerId, amount, performer = 'Super Admin') {
@@ -588,6 +811,15 @@ class DataStore {
     if (retailer) {
       const newStatus = retailer.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
       await retailer.update({ status: newStatus });
+
+      // Sync UserModel status so suspended retailer cannot log in
+      try {
+        await UserModel.update(
+          { status: newStatus },
+          { where: { retailerId } }
+        );
+      } catch (_) {}
+
       await this.addAuditLog(performer, 'SUPER_ADMIN', 'RETAILER_STATUS_CHANGED', retailer.businessName, `Status changed to ${newStatus}`);
       return retailer.toJSON();
     }

@@ -8,7 +8,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dialect = process.env.DB_DIALECT || 'postgres';
+const databaseUrl = process.env.DATABASE_URL;
+const dialect = process.env.DB_DIALECT || (databaseUrl ? 'postgres' : 'sqlite');
 const host = process.env.DB_HOST || 'localhost';
 const port = parseInt(process.env.DB_PORT || '5432', 10);
 const database = process.env.DB_NAME || 'installment_guard';
@@ -17,7 +18,24 @@ const password = process.env.DB_PASSWORD || 'postgres';
 
 let sequelize;
 
-if (dialect === 'sqlite') {
+if (databaseUrl) {
+  sequelize = new Sequelize(databaseUrl, {
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: databaseUrl.includes('localhost') ? {} : {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+  });
+} else if (dialect === 'sqlite') {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: path.join(__dirname, '../database.sqlite'),

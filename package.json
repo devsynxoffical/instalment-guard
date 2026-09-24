@@ -1,0 +1,12 @@
+{
+  "name": "installment-guard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Installment Guard MDM & Asset Protection System",
+  "scripts": {
+    "build": "npm --prefix admin_panel install && npm --prefix admin_panel run build && npm --prefix server install",
+    "start": "npm --prefix server start",
+    "server": "npm --prefix server start",
+    "client": "npm --prefix admin_panel run dev"
+  }
+}

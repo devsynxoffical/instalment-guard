@@ -13,8 +13,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { auditService } from './auditService';
+import { API_BASE_URL } from '../config/api';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const BACKEND_API = `${API_BASE_URL}/api`;
 
 export const deviceService = {
   // Determine online state based on lastSeen / lastCheckIn timestamp
@@ -32,8 +33,8 @@ export const deviceService = {
   async fetchDevices(retailerIdFilter = null) {
     try {
       const url = retailerIdFilter && retailerIdFilter !== 'SUPER_ADMIN_ALL'
-        ? `${API_BASE_URL}/devices?retailerId=${encodeURIComponent(retailerIdFilter)}`
-        : `${API_BASE_URL}/devices`;
+        ? `${BACKEND_API}/devices?retailerId=${encodeURIComponent(retailerIdFilter)}`
+        : `${BACKEND_API}/devices`;
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
@@ -66,7 +67,7 @@ export const deviceService = {
   // Enroll Device via Node.js Backend API
   async enrollDevice(enrollmentData, retailerId, performerName = 'Retailer', role = 'RETAILER') {
     try {
-      const res = await fetch(`${API_BASE_URL}/devices/enroll`, {
+      const res = await fetch(`${BACKEND_API}/devices/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enrollmentData, retailerId, performerName, role }),
@@ -85,7 +86,7 @@ export const deviceService = {
   // Dispatch Remote Commands (RESTRICT_DEVICE, REMOVE_RESTRICTION, HIDE_APP, UNHIDE_APP, WIPE_DEVICE)
   async dispatchCommand(deviceId, commandType, unlockPin = '1234', lockMessage = '', performerName = 'Admin', role = 'ADMIN', retailerId = null) {
     try {
-      const res = await fetch(`${API_BASE_URL}/commands/dispatch`, {
+      const res = await fetch(`${BACKEND_API}/commands/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, commandType, unlockPin, lockMessage, performerName, role, retailerId }),
@@ -104,7 +105,7 @@ export const deviceService = {
   // Customer Credit Check
   async checkCreditScore(cnic, phone = '') {
     try {
-      const url = `${API_BASE_URL}/credit-check?cnic=${encodeURIComponent(cnic || '')}&phone=${encodeURIComponent(phone || '')}`;
+      const url = `${BACKEND_API}/credit-check?cnic=${encodeURIComponent(cnic || '')}&phone=${encodeURIComponent(phone || '')}`;
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
@@ -119,7 +120,7 @@ export const deviceService = {
   // Defaulter Search across all store records
   async checkDefaulter(queryStr, retailerName = '') {
     try {
-      const url = `${API_BASE_URL}/defaulter-check?q=${encodeURIComponent(queryStr || '')}&retailerName=${encodeURIComponent(retailerName)}`;
+      const url = `${BACKEND_API}/defaulter-check?q=${encodeURIComponent(queryStr || '')}&retailerName=${encodeURIComponent(retailerName)}`;
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
@@ -134,7 +135,7 @@ export const deviceService = {
   // Create Appliance Contract (Multi-Appliance Finance Section)
   async createContract(contractData) {
     try {
-      const res = await fetch(`${API_BASE_URL}/contracts`, {
+      const res = await fetch(`${BACKEND_API}/contracts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contractData),
@@ -152,7 +153,7 @@ export const deviceService = {
   // Upload Contract Documents (Contract Picture & CNIC Photo)
   async uploadContractDocuments(contractId, contractImageUrl, cnicImageUrl) {
     try {
-      const res = await fetch(`${API_BASE_URL}/contracts/upload-document`, {
+      const res = await fetch(`${BACKEND_API}/contracts/upload-document`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contractId, contractImageUrl, cnicImageUrl }),
@@ -169,7 +170,7 @@ export const deviceService = {
   // Delete Device via Node.js Backend API
   async deleteDevice(deviceId, retailerId = null, performerName = 'Admin', role = 'ADMIN') {
     try {
-      const res = await fetch(`${API_BASE_URL}/devices/${encodeURIComponent(deviceId)}`, {
+      const res = await fetch(`${BACKEND_API}/devices/${encodeURIComponent(deviceId)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ retailerId, performerName, role }),

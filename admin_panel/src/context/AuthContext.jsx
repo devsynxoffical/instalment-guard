@@ -7,6 +7,9 @@ import { paymentService } from '../services/paymentService';
 import { commandService } from '../services/commandService';
 import { auditService } from '../services/auditService';
 import { notificationService } from '../services/notificationService';
+import { API_BASE_URL } from '../config/api';
+
+const BACKEND_API = `${API_BASE_URL}/api`;
 
 const DEFAULT_RETAILERS = [];
 const DEFAULT_DEVICES = [];
@@ -78,7 +81,7 @@ export const AuthProvider = ({ children }) => {
     setNotifications([]);
 
     try {
-      await fetch('http://localhost:5000/api/system/reset');
+      await fetch(`${BACKEND_API}/system/reset`);
     } catch (_) {}
   };
 
@@ -95,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     let isSubscribed = true;
     const fetchBackendData = async () => {
       try {
-        const resDev = await fetch('http://localhost:5000/api/devices');
+        const resDev = await fetch(`${BACKEND_API}/devices`);
         if (resDev.ok && isSubscribed) {
           const jsonDev = await resDev.json();
           if (jsonDev.success && Array.isArray(jsonDev.data)) {
@@ -107,7 +110,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        const resCtr = await fetch('http://localhost:5000/api/contracts');
+        const resCtr = await fetch(`${BACKEND_API}/contracts`);
         if (resCtr.ok && isSubscribed) {
           const jsonCtr = await resCtr.json();
           if (jsonCtr.success && Array.isArray(jsonCtr.data)) {
@@ -122,7 +125,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        const resRet = await fetch('http://localhost:5000/api/retailers');
+        const resRet = await fetch(`${BACKEND_API}/retailers`);
         if (resRet.ok && isSubscribed) {
           const jsonRet = await resRet.json();
           if (jsonRet.success && Array.isArray(jsonRet.data)) {
@@ -239,19 +242,25 @@ export const AuthProvider = ({ children }) => {
     };
   }, [role, activeRetailerId]);
 
-  // Role Switcher
+  // Role Switcher (Super Admin can inspect specific retailer scopes)
   const switchRole = (newRole) => {
+    // Only allow role elevation if the authenticated user account is SUPER_ADMIN
+    const isSuperAdminAccount = currentUser?.role === 'SUPER_ADMIN' || currentUser?.email === 'admin@installmentguard.com';
+    
+    if (newRole === 'SUPER_ADMIN' && !isSuperAdminAccount) {
+      console.warn('Access denied: Retailer accounts cannot switch to Super Admin mode.');
+      return;
+    }
+
     setRole(newRole);
     if (newRole === 'SUPER_ADMIN') {
       setActiveRetailerId('SUPER_ADMIN');
     }
     const targetRetailer = retailers.find((r) => r.id === activeRetailerId) || retailers[0];
     const sessionUser = {
-      uid: currentUser?.uid || 'user-active',
-      email: currentUser?.email || (newRole === 'SUPER_ADMIN' ? 'admin@installmentguard.com' : targetRetailer?.email || 'retailer@store.com'),
-      name: newRole === 'SUPER_ADMIN' ? 'Super Admin' : targetRetailer?.businessName || targetRetailer?.ownerName || 'Retailer Partner',
+      ...currentUser,
       role: newRole,
-      retailerId: newRole === 'RETAILER' ? (targetRetailer?.id || 'RET-101') : null,
+      retailerId: newRole === 'RETAILER' ? (currentUser?.retailerId || targetRetailer?.id || 'RET-101') : null,
     };
     setCurrentUser(sessionUser);
     setUserProfile(sessionUser);
@@ -260,42 +269,23 @@ export const AuthProvider = ({ children }) => {
 
   // Auth Actions
   const login = async (email, password) => {
-    const inputEmail = (email || '').toLowerCase().trim();
-    const matchedRetailer = retailers.find(
-      (r) => r.email?.toLowerCase().trim() === inputEmail || r.id?.toLowerCase() === inputEmail
-    );
+    const result = await authService.login(email, password);
+    const authUser = result.user;
 
-    const userRole = matchedRetailer || inputEmail.includes('retailer') ? 'RETAILER' : 'SUPER_ADMIN';
-    const targetRetailerId = matchedRetailer ? matchedRetailer.id : (activeRetailerId || 'RET-101');
+    setCurrentUser(authUser);
+    setUserProfile(authUser);
+    setRole(authUser.role || 'SUPER_ADMIN');
+    setActiveRetailerId(authUser.retailerId || 'SUPER_ADMIN');
 
-    const activeUser = {
-      uid: 'user-' + Date.now(),
-      email: email || (userRole === 'SUPER_ADMIN' ? 'admin@installmentguard.com' : matchedRetailer?.email || 'retailer@store.com'),
-      name: userRole === 'SUPER_ADMIN'
-        ? 'Super Admin'
-        : (matchedRetailer?.businessName || matchedRetailer?.ownerName || 'Retailer Partner Store'),
-      role: userRole,
-      status: 'ACTIVE',
-      retailerId: userRole === 'RETAILER' ? targetRetailerId : null,
-    };
-
-    setCurrentUser(activeUser);
-    setUserProfile(activeUser);
-    setRole(userRole);
-    if (userRole === 'RETAILER') setActiveRetailerId(targetRetailerId);
-    localStorage.setItem('ig_demo_auth', JSON.stringify(activeUser));
-
-    // Background Firebase Login
-    authService.login(email, password).catch(() => {});
-
-    return { user: activeUser, profile: activeUser };
+    return { user: authUser, profile: authUser, token: result.token };
   };
 
   const logout = async () => {
-    authService.logout().catch(() => {});
+    await authService.logout();
     setCurrentUser(null);
     setUserProfile(null);
-    localStorage.removeItem('ig_demo_auth');
+    setRole('SUPER_ADMIN');
+    setActiveRetailerId('SUPER_ADMIN');
   };
 
   const resetPassword = async (email) => {

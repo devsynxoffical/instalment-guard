@@ -10,8 +10,9 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { auditService } from './auditService';
+import { API_BASE_URL } from '../config/api';
+
+const BACKEND_API = `${API_BASE_URL}/api`;
 
 export const retailerService = {
   // Fetch all retailers
@@ -61,17 +62,18 @@ export const retailerService = {
         phone: data.phone,
         address: data.address || '',
         city: data.city,
-        credits: parseInt(data.initialCredits, 10) || 0,
+        credits: parseInt(data.initialCredits || data.credits, 10) || 0,
         activeDevicesCount: 0,
         totalEnrolled: 0,
-        totalSpent: (parseInt(data.initialCredits, 10) || 0) * 1000,
+        totalSpent: (parseInt(data.initialCredits || data.credits, 10) || 0) * 1000,
         status: data.status || 'ACTIVE',
+        password: data.password || data.initialPassword || 'Retailer@12345',
         createdAt: new Date().toISOString().split('T')[0],
         timestamp: serverTimestamp(),
       };
 
       try {
-        await fetch('http://localhost:5000/api/retailers', {
+        await fetch(`${BACKEND_API}/retailers`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newRetailer),

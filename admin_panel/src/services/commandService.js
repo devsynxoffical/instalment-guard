@@ -13,8 +13,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { auditService } from './auditService';
+import { API_BASE_URL } from '../config/api';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const BACKEND_API = `${API_BASE_URL}/api`;
 
 export const commandService = {
   // Dispatch Command to Node.js Live Backend Engine
@@ -28,7 +29,7 @@ export const commandService = {
     retailerId = null
   ) {
     try {
-      const res = await fetch(`${API_BASE_URL}/commands/dispatch`, {
+      const res = await fetch(`${BACKEND_API}/commands/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
