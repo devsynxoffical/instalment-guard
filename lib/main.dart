@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'features/setup/screens/device_ready_screen.dart';
 import 'features/setup/screens/device_restricted_screen.dart';
 import 'features/setup/screens/device_setup_screen.dart';
+import 'features/setup/screens/enrollment_status_screen.dart';
 import 'services/device_management/device_management_service.dart';
 
 void main() {
@@ -83,7 +84,9 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
     } else if (status == 'COMPLETED') {
       targetWidget = const DeviceReadyScreen();
     } else {
-      targetWidget = const DeviceSetupScreen();
+      // Zero-Touch Auto Enrollment on First Launch
+      final String autoContractId = 'CTR-${info['deviceId']?.toString().substring(0, 6) ?? DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+      targetWidget = EnrollmentStatusScreen(contractId: autoContractId);
     }
 
     if (mounted) {
