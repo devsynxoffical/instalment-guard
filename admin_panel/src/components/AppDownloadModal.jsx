@@ -16,7 +16,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
   const [copiedAdb, setCopiedAdb] = useState(false);
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
-  const [qrMode, setQrMode] = useState('dpc'); // 'dpc' | 'direct'
+  const [qrMode, setQrMode] = useState('direct'); // 'direct' | 'dpc'
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   // Retailer Scope
@@ -45,7 +45,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
     }
   });
 
-  const activeQrText = qrMode === 'dpc' ? dpcProvisioningPayload : apkUrl;
+  const activeQrText = qrMode === 'direct' ? apkUrl : dpcProvisioningPayload;
   const backendQrUrl = `/api/qr?text=${encodeURIComponent(activeQrText)}`;
 
   useEffect(() => {
@@ -143,18 +143,6 @@ export default function AppDownloadModal({ isOpen, onClose }) {
               <div className="md:col-span-2 flex items-center justify-center gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setQrMode('dpc')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    qrMode === 'dpc'
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  Anti-Tamper Device Owner QR (6-Taps Setup)
-                </button>
-                <button
-                  type="button"
                   onClick={() => setQrMode('direct')}
                   className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                     qrMode === 'direct'
@@ -163,7 +151,19 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                   }`}
                 >
                   <Download className="w-4 h-4" />
-                  Direct APK Download QR (Camera Scan)
+                  Direct APK Download QR (Phone Camera)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrMode('dpc')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                    qrMode === 'dpc'
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Zero-Touch DPC QR (6-Taps Setup)
                 </button>
               </div>
 
@@ -171,7 +171,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
               <div className="flex flex-col items-center justify-center p-5 bg-slate-950/60 rounded-2xl border border-slate-800 shadow-inner">
                 <div 
                   className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer flex items-center justify-center min-w-[240px] min-h-[240px]"
-                  title={qrMode === 'dpc' ? "Scan during Android 6-taps Welcome screen" : "Scan with camera to download APK"}
+                  title={qrMode === 'direct' ? "Scan with standard phone camera to download APK" : "Scan during Android 6-taps Welcome screen"}
                 >
                   {qrDataUrl ? (
                     <img 
@@ -187,9 +187,9 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                 </div>
                 <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5 text-center">
                   <Wifi className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  {qrMode === 'dpc' 
-                    ? 'Scan with Android 6-Taps Provisioning Reader' 
-                    : 'Scan with Android Camera to Download APK'}
+                  {qrMode === 'direct' 
+                    ? 'Scan with standard Phone Camera or QR app to download APK' 
+                    : 'Scan with Android 6-Taps Provisioning Reader (Reset Screen)'}
                 </p>
               </div>
 
