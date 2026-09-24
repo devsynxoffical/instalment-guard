@@ -206,8 +206,10 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
         val wasRestricted = isDeviceRestricted()
         saveRestrictionStatus(isRestricted)
 
+        // Always keep foreground security service running 24/7 for continuous live heartbeat & telemetry
+        RestrictionForegroundService.startService(context)
+
         if (isRestricted) {
-            RestrictionForegroundService.startService(context)
             if (!wasRestricted) {
                 try {
                     val intent = Intent(context, com.example.installment_guard.MainActivity::class.java).apply {
@@ -222,8 +224,6 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
                     Log.e(TAG, "Failed to bring MainActivity to foreground on restriction: ${e.message}")
                 }
             }
-        } else {
-            RestrictionForegroundService.stopService(context)
         }
 
         if (!isManagedDevice()) {

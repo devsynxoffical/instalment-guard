@@ -189,10 +189,10 @@ export const DeviceDetailPage = () => {
     );
   }
 
-  const totalPrice = contract.totalPrice || 45000;
-  const remainingBal = contract.remainingBalance ?? payInfo.remaining;
+  const totalPrice = contract.totalPrice !== undefined && contract.totalPrice !== null ? contract.totalPrice : (device.totalPrice ?? 0);
+  const remainingBal = contract.remainingBalance !== undefined && contract.remainingBalance !== null ? contract.remainingBalance : (device.remainingBalance ?? 0);
   const totalPaid = Math.max(0, totalPrice - remainingBal);
-  const paidPercent = Math.min(100, Math.round((totalPaid / totalPrice) * 100));
+  const paidPercent = totalPrice > 0 ? Math.min(100, Math.round((totalPaid / totalPrice) * 100)) : 0;
 
   const handleTriggerCommand = (commandType, pinVal = null) => {
     let title = 'Confirm Command Dispatch';

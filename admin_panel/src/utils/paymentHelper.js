@@ -14,9 +14,22 @@ export const getDevicePaymentStatus = (device, contracts = []) => {
     (c) => c.contractId === device.contractId || c.deviceId === device.deviceId
   );
 
-  const remaining = contract ? (contract.remainingBalance ?? 0) : 35000;
-  const isPaid = (contract && (contract.remainingBalance <= 0 || contract.status === 'COMPLETED')) || device.deviceStatus === 'COMPLETED';
+  const totalPrice = contract ? (contract.totalPrice ?? 0) : (device.totalPrice ?? 0);
+  const remaining = contract ? (contract.remainingBalance ?? 0) : (device.remainingBalance ?? 0);
+  const isPaid = totalPrice > 0 && ((contract && (contract.remainingBalance <= 0 || contract.status === 'COMPLETED')) || device.deviceStatus === 'COMPLETED');
   const isOverdue = device.isRestricted || (contract && (contract.status === 'RESTRICTED' || contract.status === 'OVERDUE'));
+
+  if (totalPrice <= 0) {
+    return {
+      status: 'NO_PLAN',
+      label: '📝 NO PLAN SET',
+      subLabel: 'Click "Edit Plan" to configure',
+      detail: 'Installment Plan Not Configured',
+      badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 font-bold',
+      remaining: 0,
+      contract,
+    };
+  }
 
   if (isPaid) {
     return {
