@@ -77,9 +77,11 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
                 try {
                     dpm.setApplicationHidden(adminComponent, context.packageName, false)
                     val pm = context.packageManager
-                    val launcherComponent = ComponentName(context, com.example.installment_guard.MainActivity::class.java)
-                    pm.setComponentEnabledSetting(launcherComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP)
-                } catch (e: Exception) {}
+                    val aliasComponent = ComponentName(context.packageName, "com.example.installment_guard.SetupLauncherActivity")
+                    pm.setComponentEnabledSetting(aliasComponent, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error restoring launcher icon visibility: ${e.message}")
+                }
             }
 
             Log.i(TAG, "Successfully applied managed device policy restrictions.")
@@ -430,6 +432,21 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
     private fun getBatteryInfo(): Map<String, Any> {
         val batteryInfo = mutableMapOf<String, Any>()
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                val capacity = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+                if (capacity in 0..100) {
+                    batteryInfo["batteryLevel"] = capacity
+                    val isCharging = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        bm?.isCharging == true
+                    } else {
+                        false
+                    }
+                    batteryInfo["isCharging"] = isCharging
+                    return batteryInfo
+                }
+            }
+
             val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
             val batteryStatus: Intent? = context.registerReceiver(null, intentFilter)
             
