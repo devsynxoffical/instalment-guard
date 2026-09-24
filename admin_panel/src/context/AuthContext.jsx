@@ -22,27 +22,19 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const savedDemoAuth = localStorage.getItem('ig_demo_auth');
-      if (savedDemoAuth) {
-        const parsed = JSON.parse(savedDemoAuth);
+      const token = localStorage.getItem('ig_auth_token');
+      const savedAuth = localStorage.getItem('ig_demo_auth');
+      if (token && savedAuth) {
+        const parsed = JSON.parse(savedAuth);
         if (parsed && parsed.email) return parsed;
       }
     } catch (_) {}
-    const defaultUser = {
-      uid: 'super-admin-001',
-      email: 'admin@installmentguard.com',
-      name: 'Super Admin',
-      role: 'SUPER_ADMIN',
-      status: 'ACTIVE',
-      retailerId: null,
-    };
-    try { localStorage.setItem('ig_demo_auth', JSON.stringify(defaultUser)); } catch (_) {}
-    return defaultUser;
+    return null;
   });
 
   const [userProfile, setUserProfile] = useState(() => currentUser);
-  const [role, setRole] = useState(() => currentUser?.role || 'SUPER_ADMIN');
-  const [activeRetailerId, setActiveRetailerId] = useState(() => currentUser?.retailerId || 'SUPER_ADMIN');
+  const [role, setRole] = useState(() => currentUser?.role || null);
+  const [activeRetailerId, setActiveRetailerId] = useState(() => currentUser?.retailerId || null);
   const [loading, setLoading] = useState(false);
 
   // Initial State starts clean with empty arrays - driven strictly by Node.js Backend API
@@ -150,29 +142,39 @@ export const AuthProvider = ({ children }) => {
 
   // Restore Auth Session
   useEffect(() => {
-    const savedDemoAuth = localStorage.getItem('ig_demo_auth');
-    if (savedDemoAuth) {
-      try {
-        const parsed = JSON.parse(savedDemoAuth);
-        if (parsed && parsed.email) {
-          setCurrentUser(parsed);
-          setUserProfile(parsed);
-          if (parsed.role) setRole(parsed.role);
-          if (parsed.retailerId) setActiveRetailerId(parsed.retailerId);
-        }
-      } catch (e) {
-        console.warn('Failed to parse saved session:', e);
-      }
+    const token = localStorage.getItem('ig_auth_token');
+    const savedAuth = localStorage.getItem('ig_demo_auth');
+
+    if (!token || !savedAuth) {
+      setCurrentUser(null);
+      setUserProfile(null);
+      setRole(null);
+      setActiveRetailerId(null);
+      setLoading(false);
+      return;
     }
+
+    try {
+      const parsed = JSON.parse(savedAuth);
+      if (parsed && parsed.email) {
+        setCurrentUser(parsed);
+        setUserProfile(parsed);
+        if (parsed.role) setRole(parsed.role);
+        if (parsed.retailerId) setActiveRetailerId(parsed.retailerId);
+      }
+    } catch (_) {}
 
     const unsubscribeAuth = authService.onAuthChange(({ user, profile }) => {
       if (user) {
         setCurrentUser(user);
-        if (profile) {
-          setUserProfile(profile);
-          setRole(profile.role || 'SUPER_ADMIN');
-          if (profile.retailerId) setActiveRetailerId(profile.retailerId);
-        }
+        setUserProfile(profile || user);
+        setRole(user.role || 'SUPER_ADMIN');
+        if (user.retailerId) setActiveRetailerId(user.retailerId);
+      } else {
+        setCurrentUser(null);
+        setUserProfile(null);
+        setRole(null);
+        setActiveRetailerId(null);
       }
       setLoading(false);
     });

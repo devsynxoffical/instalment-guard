@@ -38,11 +38,19 @@ import { GlobalSearchDialog } from './components/GlobalSearchDialog';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { currentUser, role } = useAuth();
+  const { currentUser, role, loading } = useAuth();
   const location = useLocation();
 
-  // If unauthenticated (and demo mode is inactive), redirect to /login
-  if (!currentUser && !localStorage.getItem('ig_demo_auth')) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 text-slate-700 text-sm font-semibold">
+        Authenticating...
+      </div>
+    );
+  }
+
+  // If unauthenticated, redirect to /login
+  if (!currentUser) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
