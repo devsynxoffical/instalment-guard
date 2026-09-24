@@ -524,6 +524,8 @@ export const AuthProvider = ({ children }) => {
     };
     setAuditLogs((prev) => [logItem, ...prev]);
 
+    retailerService.deleteRetailer(retailerId, performer).catch(() => {});
+
     return true;
   };
 

@@ -173,4 +173,22 @@ export const retailerService = {
       throw error;
     }
   },
+
+  // Delete Retailer
+  async deleteRetailer(retailerId, performerName = 'Super Admin') {
+    try {
+      try {
+        await fetch(`${BACKEND_API}/retailers/${encodeURIComponent(retailerId)}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ performerName }),
+        });
+      } catch (_) {}
+
+      return true;
+    } catch (error) {
+      console.error('Delete Retailer Error:', error);
+      throw error;
+    }
+  },
 };
