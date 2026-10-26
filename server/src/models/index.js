@@ -123,3 +123,17 @@ export const BleRelayModel = sequelize.define('BleRelay', {
   longitude: { type: DataTypes.FLOAT, defaultValue: 0 },
   rssi: { type: DataTypes.INTEGER, defaultValue: -70 },
 }, { timestamps: true });
+
+export const PaymentModel = sequelize.define('Payment', {
+  paymentId: { type: DataTypes.STRING, primaryKey: true },
+  contractId: { type: DataTypes.STRING, allowNull: false },
+  customerName: { type: DataTypes.STRING, defaultValue: 'Customer' },
+  retailerId: { type: DataTypes.STRING, defaultValue: '' },
+  amount: { type: DataTypes.FLOAT, defaultValue: 0 },
+  method: { type: DataTypes.STRING, defaultValue: 'Cash' },
+  reference: { type: DataTypes.STRING, defaultValue: '' },
+  paymentDate: { type: DataTypes.STRING, defaultValue: '' },
+  recordedBy: { type: DataTypes.STRING, defaultValue: 'Retailer' },
+  notes: { type: DataTypes.TEXT, defaultValue: '' },
+}, { timestamps: true });
+

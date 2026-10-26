@@ -24,7 +24,7 @@ export const Sidebar = ({ sidebarState = 'EXPANDED', setSidebarState }) => {
   const isCollapsed = sidebarState === 'COLLAPSED';
   const isClosed = sidebarState === 'CLOSED';
 
-  const superAdminNavItems = [
+  const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/credit-check', label: 'Credit & Defaulter Check', icon: UserCheck },
     { path: '/devices', label: 'Devices Control', icon: Smartphone },
@@ -35,18 +35,6 @@ export const Sidebar = ({ sidebarState = 'EXPANDED', setSidebarState }) => {
     { path: '/settings', label: 'Settings', icon: Settings },
     { path: '/profile', label: 'My Profile', icon: User },
   ];
-
-  const retailerNavItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/credit-check', label: 'Credit & Defaulter Check', icon: UserCheck },
-    { path: '/devices', label: 'My Enrolled Devices', icon: Smartphone },
-    { path: '/contracts', label: 'Finance & Contracts', icon: FileText },
-    { path: '/payments', label: 'Customer Payments', icon: CreditCard },
-    { path: '/audit-logs', label: 'My Activity Trail', icon: ShieldCheck },
-    { path: '/profile', label: 'My Profile', icon: User },
-  ];
-
-  const navItems = role === 'SUPER_ADMIN' ? superAdminNavItems : retailerNavItems;
 
   const getSidebarWidthClass = () => {
     if (isClosed) return 'w-0 opacity-0 pointer-events-none border-0 overflow-hidden -translate-x-full md:-translate-x-full';

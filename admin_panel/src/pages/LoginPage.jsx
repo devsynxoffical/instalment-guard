@@ -60,11 +60,20 @@ export const LoginPage = () => {
             <ShieldCheck className="w-9 h-9" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">INSTALLMENT GUARD</h1>
-          <h2 className="text-sm font-semibold text-slate-700">Welcome Back</h2>
-          <p className="text-xs text-slate-500">Sign in to continue to Enterprise Admin Panel</p>
+          <h2 className="text-sm font-semibold text-teal-800">Super Admin HQ Portal</h2>
+          <p className="text-xs text-slate-500">Sign in to manage partner stores, license credits & device policies</p>
         </div>
 
-
+        {/* Retailer App Redirection Banner */}
+        <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-200/80 text-xs text-teal-900 flex items-start gap-2.5">
+          <Smartphone className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-bold">Partner Store Retailers:</span>
+            <p className="text-[11px] text-teal-800 leading-relaxed">
+              Please use the <strong>Installment Guard Retailer Android App</strong> on your mobile phone to enroll customer devices and collect payments.
+            </p>
+          </div>
+        </div>
 
         {/* Validation Error Banner */}
         {errorMsg && (

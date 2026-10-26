@@ -7,6 +7,7 @@ import {
   AdminCommandModel,
   AuditLogModel,
   BleRelayModel,
+  PaymentModel,
 } from './models/index.js';
 import { Op } from 'sequelize';
 import bcrypt from 'bcryptjs';
@@ -45,6 +46,7 @@ class DataStore {
       AdminCommandModel.init(AdminCommandModel.rawAttributes, { sequelize: sqliteDb, modelName: 'AdminCommand' });
       AuditLogModel.init(AuditLogModel.rawAttributes, { sequelize: sqliteDb, modelName: 'AuditLog' });
       BleRelayModel.init(BleRelayModel.rawAttributes, { sequelize: sqliteDb, modelName: 'BleRelay' });
+      PaymentModel.init(PaymentModel.rawAttributes, { sequelize: sqliteDb, modelName: 'Payment' });
 
       await sqliteDb.sync();
       console.log(' [DB] SQLite database fallback ready.');
@@ -986,6 +988,130 @@ class DataStore {
       details,
     });
     return log.toJSON();
+  }
+
+  // --- PAYMENT METHODS ---
+
+  async recordPayment({ contractId, amount, method = 'Cash', reference = '', notes = '', performerName = 'Retailer', role = 'RETAILER' }) {
+    await this.initDb();
+    const contract = await ContractModel.findByPk(contractId);
+    if (!contract) {
+      throw new Error(`Contract ${contractId} not found`);
+    }
+
+    const payAmount = parseFloat(amount) || 0;
+    const newRemaining = Math.max(0, (contract.remainingBalance || 0) - payAmount);
+    const newPaidMonths = (contract.paidMonths || 0) + 1;
+    const newStatus = newRemaining <= 0 ? 'COMPLETED' : 'ACTIVE';
+
+    await contract.update({
+      remainingBalance: newRemaining,
+      paidMonths: newPaidMonths,
+      status: newStatus,
+    });
+
+    // Update associated device
+    let device = null;
+    if (contract.deviceId) {
+      device = await DeviceModel.findByPk(contract.deviceId);
+      if (device) {
+        const devUpdates = {
+          deviceStatus: newStatus === 'COMPLETED' ? 'COMPLETED' : 'ACTIVE',
+        };
+        // Auto-unlock phone if payment received and restriction cleared
+        if (newRemaining <= 0 || device.isRestricted) {
+          devUpdates.isRestricted = false;
+        }
+        await device.update(devUpdates);
+
+        // Dispatch remove restriction command if previously locked
+        if (device.isRestricted || newRemaining <= 0) {
+          await this.addCommand(device.deviceId, 'REMOVE_RESTRICTION', {
+            reason: `Payment Received: Rs. ${payAmount}`,
+            contractId,
+          }, contract.retailerId || 'RET-101');
+        }
+      }
+    }
+
+    const paymentId = `PAY-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    const payment = await PaymentModel.create({
+      paymentId,
+      contractId,
+      customerName: contract.customerName || 'Customer',
+      retailerId: contract.retailerId || '',
+      amount: payAmount,
+      method,
+      reference: reference || `REF-${Math.floor(100000 + Math.random() * 900000)}`,
+      paymentDate: new Date().toISOString(),
+      recordedBy: performerName,
+      notes,
+    });
+
+    await this.addAuditLog(
+      performerName,
+      role,
+      'RECORD_PAYMENT',
+      `${contractId} (${contract.customerName})`,
+      `Received payment of Rs. ${payAmount} via ${method}. Remaining: Rs. ${newRemaining}`
+    );
+
+    return {
+      payment: payment.toJSON(),
+      contract: contract.toJSON(),
+      device: device ? device.toJSON() : null,
+    };
+  }
+
+  async getPayments(retailerId = null) {
+    await this.initDb();
+    let payments;
+    if (retailerId && retailerId !== 'SUPER_ADMIN' && retailerId !== 'SUPER_ADMIN_ALL') {
+      payments = await PaymentModel.findAll({
+        where: { retailerId },
+        order: [['createdAt', 'DESC']],
+      });
+    } else {
+      payments = await PaymentModel.findAll({
+        order: [['createdAt', 'DESC']],
+      });
+    }
+    return payments.map((p) => p.toJSON());
+  }
+
+  async updateRetailerPassword(retailerId, newPassword) {
+    await this.initDb();
+    if (!retailerId || !newPassword) {
+      throw new Error('Retailer ID and new password are required');
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const user = await UserModel.findOne({ where: { retailerId } });
+    if (user) {
+      await user.update({ password: hashedPassword });
+      return { success: true, email: user.email };
+    }
+    // If not found by retailerId, search by retailer email
+    const retailer = await RetailerModel.findByPk(retailerId);
+    if (retailer && retailer.email) {
+      const userByEmail = await UserModel.findOne({ where: { email: retailer.email } });
+      if (userByEmail) {
+        await userByEmail.update({ password: hashedPassword, retailerId });
+        return { success: true, email: userByEmail.email };
+      }
+      // Create user if not exists
+      await UserModel.create({
+        id: `USR-${retailerId}`,
+        email: retailer.email,
+        password: hashedPassword,
+        name: retailer.ownerName || retailer.businessName,
+        role: 'RETAILER',
+        retailerId,
+        status: 'ACTIVE',
+        phone: retailer.phone || '',
+      });
+      return { success: true, email: retailer.email };
+    }
+    throw new Error('Retailer user account not found');
   }
 }
 

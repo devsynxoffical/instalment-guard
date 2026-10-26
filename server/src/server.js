@@ -381,6 +381,46 @@ app.get('/download/installment_guard.apk', (req, res) => {
   `);
 });
 
+// GET Retailer Mobile APK Direct Download Handler
+app.get('/download/retailer_app.apk', (req, res) => {
+  // 1. Check if external direct APK download URL is configured
+  if (process.env.RETAILER_APK_DOWNLOAD_URL) {
+    return res.redirect(process.env.RETAILER_APK_DOWNLOAD_URL);
+  }
+
+  // 2. Check local physical binary
+  const apkPath = path.join(__dirname, '../public/download/retailer_app.apk');
+  if (fs.existsSync(apkPath) && fs.statSync(apkPath).size > 1024 * 1024) {
+    return res.download(apkPath, 'retailer_app.apk');
+  }
+
+  // 3. Fallback instruction
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Retailer App APK Download</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; text-align: center; }
+          .card { max-width: 480px; margin: 40px auto; background: #1e293b; border: 1px solid #0f766e; border-radius: 20px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          h2 { color: #14b8a6; margin-top: 0; }
+          p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+          .badge { display: inline-block; background: #0f766e; color: #ffffff; font-weight: bold; padding: 4px 12px; border-radius: 9999px; font-size: 12px; margin-bottom: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">Installment Guard Retailer v1.0.0</div>
+          <h2>Retailer APK Download Ready</h2>
+          <p>The Installment Guard Retailer Partner App APK is ready. Install this on the shopkeeper / retailer mobile phone to manage devices and enroll mobiles.</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
 // GET Retailers
 app.get('/api/retailers', async (req, res) => {
   try {
@@ -878,6 +918,60 @@ app.post('/api/retailers/toggle-status', async (req, res) => {
     } else {
       res.status(404).json({ success: false, message: 'Retailer not found' });
     }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST Set / Reset Retailer Password
+app.post('/api/retailers/:retailerId/password', async (req, res) => {
+  try {
+    const { retailerId } = req.params;
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'New password is required' });
+    }
+    const result = await store.updateRetailerPassword(retailerId, password);
+    res.json({ success: true, message: 'Retailer password updated successfully', data: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST Record Customer Payment
+app.post('/api/payments', async (req, res) => {
+  try {
+    const { contractId, amount, method, reference, notes, performerName, role } = req.body;
+    if (!contractId || !amount) {
+      return res.status(400).json({ success: false, message: 'contractId and amount are required' });
+    }
+    const result = await store.recordPayment({
+      contractId,
+      amount,
+      method,
+      reference,
+      notes,
+      performerName,
+      role,
+    });
+    if (result.device) {
+      broadcastDeviceUpdate(result.device);
+    }
+    io.emit('contract_updated', result.contract);
+    io.emit('payment_recorded', result.payment);
+    res.json({ success: true, message: 'Payment recorded successfully', data: result });
+  } catch (e) {
+    console.error('Record payment error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET Payments
+app.get('/api/payments', async (req, res) => {
+  try {
+    const { retailerId } = req.query;
+    const payments = await store.getPayments(retailerId);
+    res.json({ success: true, count: payments.length, data: payments });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

@@ -7,6 +7,7 @@ import '../../../services/device_management/device_management_service.dart';
 import '../../../services/security/environment_config.dart';
 import '../widgets/status_card.dart';
 import 'device_restricted_screen.dart';
+import '../../retailer/screens/retailer_login_screen.dart';
 
 class DeviceReadyScreen extends StatefulWidget {
   const DeviceReadyScreen({super.key});
@@ -447,6 +448,15 @@ class _DeviceReadyScreenState extends State<DeviceReadyScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_rounded, color: AppTheme.tealPrimary),
+            tooltip: 'Retailer App Portal',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const RetailerLoginScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.analytics_outlined, color: AppTheme.tealPrimary),
             tooltip: 'Inspect Collected Data',

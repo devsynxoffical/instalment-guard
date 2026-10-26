@@ -87,13 +87,9 @@ export const Navbar = ({ onOpenSearch, onToggleSidebar, sidebarState }) => {
     { path: '/credit-check', label: 'Credit Check' },
     { path: '/devices', label: 'Devices' },
     { path: '/contracts', label: 'Contracts' },
+    { path: '/retailers', label: 'Retailers' },
     { path: '/payments', label: 'Payments' },
-    ...(role === 'SUPER_ADMIN'
-      ? [
-        { path: '/retailers', label: 'Retailers' },
-        { path: '/settings', label: 'Settings' },
-      ]
-      : []),
+    { path: '/settings', label: 'Settings' },
   ];
 
   const getPageTitle = () => {
@@ -329,7 +325,7 @@ export const Navbar = ({ onOpenSearch, onToggleSidebar, sidebarState }) => {
             className="h-9 px-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors shadow-xs flex items-center gap-1.5 shrink-0"
           >
             <div className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 font-extrabold flex items-center justify-center text-[10px]">
-              {role === 'SUPER_ADMIN' ? 'SA' : 'RET'}
+              HQ
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
@@ -338,9 +334,9 @@ export const Navbar = ({ onOpenSearch, onToggleSidebar, sidebarState }) => {
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50 animate-fade-in space-y-1">
               <div className="px-3 py-2 border-b border-slate-100">
                 <div className="font-semibold text-slate-900 text-xs">
-                  {role === 'SUPER_ADMIN' ? 'Super Admin' : activeRetailer?.businessName || 'Retailer'}
+                  Super Admin HQ
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium">{role}</div>
+                <div className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Super Admin</div>
               </div>
 
               <Link

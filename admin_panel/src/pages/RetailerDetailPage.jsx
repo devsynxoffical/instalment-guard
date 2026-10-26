@@ -16,7 +16,12 @@ import {
   UserX,
   ChevronRight,
   Trash2,
+  Key,
+  Copy,
+  Check,
+  Lock,
 } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 export const RetailerDetailPage = () => {
   const { retailerId } = useParams();
@@ -25,6 +30,9 @@ export const RetailerDetailPage = () => {
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState('devices');
+  const [newPassword, setNewPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const retailer = retailers.find((r) => r.id === retailerId) || retailers[0];
 
   if (!retailer) {
@@ -48,6 +56,42 @@ export const RetailerDetailPage = () => {
       showToast(`Retailer ${retailer.businessName} status updated to ${nextStatus}`, 'info');
     } catch (err) {
       showToast('Failed to change status.', 'error');
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      showToast('Password must be at least 6 characters long.', 'error');
+      return;
+    }
+    setSettingPassword(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/retailers/${retailer.id}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Retailer Mobile App password updated successfully!', 'success');
+        setNewPassword('');
+      } else {
+        showToast(data.message || 'Failed to update password', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed connecting to backend server', 'error');
+    } finally {
+      setSettingPassword(false);
+    }
+  };
+
+  const copyEmail = () => {
+    if (retailer.email) {
+      navigator.clipboard.writeText(retailer.email);
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2000);
+      showToast('Retailer email copied to clipboard!', 'info');
     }
   };
 
@@ -93,6 +137,70 @@ export const RetailerDetailPage = () => {
           </div>
         }
       />
+
+      {/* Retailer Mobile App Credentials Banner */}
+      <div className="teal-card p-6 bg-gradient-to-r from-teal-900/5 via-slate-900/5 to-transparent border border-teal-200/60 rounded-2xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-teal-700 text-white shadow-sm">
+                <Smartphone className="w-5 h-5" />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Retailer Mobile App Credentials</h3>
+                <p className="text-xs text-slate-500">Provide these credentials to the partner store to log into the Installment Guard Retailer Android App.</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ● App Login Enabled
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Login Username / Email</div>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm font-bold text-slate-800 select-all">{retailer.email || 'No email set'}</span>
+              <button
+                type="button"
+                onClick={copyEmail}
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+                title="Copy Email"
+              >
+                {copiedEmail ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">Used by retailer on the mobile login screen</p>
+          </div>
+
+          <form onSubmit={handleUpdatePassword} className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Set / Reset App Password</div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="New password (e.g. Retailer@123)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input-field pl-9 py-2 text-xs font-mono"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={settingPassword || !newPassword}
+                className="btn-primary py-2 px-3 text-xs font-bold whitespace-nowrap"
+              >
+                {settingPassword ? 'Saving...' : 'Update Password'}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">Changes take effect immediately on next mobile app login</p>
+          </form>
+        </div>
+      </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, ExternalLink, RefreshCw, Building2 } from 'lucide-react';
+import { QrCode, Download, Copy, Check, X, Smartphone, ShieldCheck, Wifi, ExternalLink, RefreshCw, Building2, Store } from 'lucide-react';
 import { generateQRCodeDataUrl, generateQRCodeSVG } from '../utils/qrGenerator';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,6 +13,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
     : currentHost;
 
   const [serverHost, setServerHost] = useState(defaultHost);
+  const [selectedApk, setSelectedApk] = useState('guard'); // 'guard' | 'retailer'
   const [copied, setCopied] = useState(false);
   const [copiedAdb, setCopiedAdb] = useState(false);
   const [activeTab, setActiveTab] = useState('qr'); // 'qr' | 'guide'
@@ -31,22 +32,29 @@ export default function AppDownloadModal({ isOpen, onClose }) {
     ? serverHost
     : `${isHttps || serverHost.includes('railway.app') ? 'https://' : 'http://'}${serverHost}`;
 
+  const cleanBase = baseUrl.replace(/\/+$/, '');
   const retailerQuery = effectiveRetailerId ? `?retailerId=${encodeURIComponent(effectiveRetailerId)}` : '';
-  const apkUrl = `${baseUrl.replace(/\/+$/, '')}/download/installment_guard.apk${retailerQuery}`;
+  
+  const guardApkUrl = `${cleanBase}/download/installment_guard.apk${retailerQuery}`;
+  const retailerApkUrl = `${cleanBase}/download/retailer_app.apk`;
+  const currentApkUrl = selectedApk === 'guard' ? guardApkUrl : retailerApkUrl;
 
-  // Android Enterprise Zero-Touch Device Owner Provisioning Payload
+  // Android Enterprise Zero-Touch Device Owner Provisioning Payload (for Customer Guard)
   const dpcProvisioningPayload = JSON.stringify({
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.example.installment_guard/com.example.installment_guard.device.InstallmentAdminReceiver",
-    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": apkUrl,
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": guardApkUrl,
     "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "PtPdqGxf8LVeElfVwNVi4SIMZ2thmrCwPOBFgQBqmeY",
     "android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED": true,
     "android.app.extra.PROVISIONING_ADMIN_EXTRAS_BUNDLE": {
       "retailerId": effectiveRetailerId || "RET-862",
-      "serverUrl": `${baseUrl.replace(/\/+$/, '')}/api`
+      "serverUrl": `${cleanBase}/api`
     }
   });
 
-  const activeQrText = qrMode === 'direct' ? apkUrl : dpcProvisioningPayload;
+  const activeQrText = selectedApk === 'retailer' 
+    ? retailerApkUrl 
+    : (qrMode === 'direct' ? guardApkUrl : dpcProvisioningPayload);
+    
   const backendQrUrl = `/api/qr?text=${encodeURIComponent(activeQrText)}`;
 
   useEffect(() => {
@@ -66,7 +74,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
   }, [activeQrText, backendQrUrl]);
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(apkUrl);
+    navigator.clipboard.writeText(currentApkUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -83,22 +91,22 @@ export default function AppDownloadModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn font-sans">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl shadow-amber-950/20 text-slate-100 transition-all">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl shadow-teal-950/20 text-slate-100 transition-all max-h-[92vh] flex flex-col">
         
         {/* Modal Header */}
-        <div className="relative px-6 pt-6 pb-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
+        <div className="relative px-6 pt-5 pb-4 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
-              <Smartphone className="w-6 h-6" />
+            <div className={`p-3 rounded-2xl border ${selectedApk === 'guard' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-teal-500/15 text-teal-400 border-teal-500/30'}`}>
+              {selectedApk === 'guard' ? <Smartphone className="w-6 h-6" /> : <Store className="w-6 h-6" />}
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-                Installment Guard Mobile App
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black tracking-wide shadow-xs">
-                  v1.0.0 PRO APK
+                Download Mobile APKs
+                <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-black tracking-wide ${selectedApk === 'guard' ? 'bg-amber-400 text-slate-950' : 'bg-teal-400 text-slate-950'}`}>
+                  {selectedApk === 'guard' ? 'CUSTOMER GUARD' : 'RETAILER APP'}
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">Scan QR Code to download or setup Device Owner on customer phones</p>
+              <p className="text-xs text-slate-400">Two dedicated Android APKs: One for customer devices, one for retailers</p>
             </div>
           </div>
 
@@ -110,107 +118,143 @@ export default function AppDownloadModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2">
+        {/* APK Switcher Bar */}
+        <div className="grid grid-cols-2 p-2 bg-slate-950/70 border-b border-slate-800 gap-2 shrink-0 px-6">
           <button
-            onClick={() => setActiveTab('qr')}
-            className={`px-4 py-2.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'qr'
-                ? 'border-amber-400 text-amber-400 bg-amber-500/10 rounded-t-lg'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+            onClick={() => { setSelectedApk('guard'); }}
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              selectedApk === 'guard'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-800/50'
             }`}
           >
-            <QrCode className="w-4 h-4" />
-            QR Code & Download Link
+            <Smartphone className="w-4 h-4 text-amber-400" />
+            <span>1. Customer Guard APK</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300">Device Owner</span>
           </button>
           <button
-            onClick={() => setActiveTab('guide')}
-            className={`px-4 py-2.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all ${
-              activeTab === 'guide'
-                ? 'border-amber-400 text-amber-400 bg-amber-500/10 rounded-t-lg'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+            onClick={() => { setSelectedApk('retailer'); setActiveTab('qr'); }}
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              selectedApk === 'retailer'
+                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-800/50'
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
-            Setup & Provisioning Guide
+            <Store className="w-4 h-4 text-teal-400" />
+            <span>2. Retailer App APK</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-400/20 text-teal-300">Shopkeeper</span>
           </button>
         </div>
 
+        {/* Tab Switcher (Only needed for Guard APK, or for Guide) */}
+        {selectedApk === 'guard' ? (
+          <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 shrink-0">
+            <button
+              onClick={() => setActiveTab('qr')}
+              className={`px-4 py-2 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                activeTab === 'qr'
+                  ? 'border-amber-400 text-amber-400 bg-amber-500/10 rounded-t-lg'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              QR Code & Download Link
+            </button>
+            <button
+              onClick={() => setActiveTab('guide')}
+              className={`px-4 py-2 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                activeTab === 'guide'
+                  ? 'border-amber-400 text-amber-400 bg-amber-500/10 rounded-t-lg'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Setup & Provisioning Guide
+            </button>
+          </div>
+        ) : (
+          <div className="px-6 py-2 bg-teal-950/30 border-b border-teal-900/40 text-xs text-teal-300 flex items-center justify-between shrink-0">
+            <span className="flex items-center gap-1.5">
+              <Store className="w-4 h-4 text-teal-400" /> Retailers use this app on their Android mobile to manage customers and lock devices.
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-900/60 text-teal-200 border border-teal-700/50">
+              retailer_app.apk
+            </span>
+          </div>
+        )}
+
         {/* Modal Content */}
-        <div className="p-6">
-          {activeTab === 'qr' ? (
+        <div className="p-6 overflow-y-auto space-y-4">
+          {activeTab === 'qr' || selectedApk === 'retailer' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              {/* QR Mode Switcher */}
-              <div className="md:col-span-2 flex items-center justify-center gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setQrMode('direct')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    qrMode === 'direct'
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Download className="w-4 h-4" />
-                  Direct APK Download QR (Phone Camera)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQrMode('dpc')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                    qrMode === 'dpc'
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  Zero-Touch DPC QR (6-Taps Setup)
-                </button>
-              </div>
+              
+              {/* QR Mode Switcher (only for Guard APK) */}
+              {selectedApk === 'guard' ? (
+                <div className="md:col-span-2 flex items-center justify-center gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setQrMode('direct')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      qrMode === 'direct'
+                        ? 'bg-amber-400 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Download className="w-4 h-4" />
+                    Direct APK Download QR (Phone Camera)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQrMode('dpc')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      qrMode === 'dpc'
+                        ? 'bg-amber-400 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    Zero-Touch DPC QR (6-Taps Setup)
+                  </button>
+                </div>
+              ) : (
+                <div className="md:col-span-2 p-3 bg-teal-500/10 border border-teal-500/20 rounded-2xl text-xs text-teal-200 flex items-center gap-2">
+                  <Store className="w-4 h-4 text-teal-400 shrink-0" />
+                  <div>
+                    <strong>Retailer App Installation:</strong> Retailers download this APK on their personal phone, log in with credentials you provide in the <em>Retailers</em> tab, and enroll customer phones directly from their counter.
+                  </div>
+                </div>
+              )}
 
               {/* QR Code Container */}
               <div className="flex flex-col items-center justify-center p-5 bg-slate-950/60 rounded-2xl border border-slate-800 shadow-inner">
                 <div 
-                  className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer flex items-center justify-center min-w-[240px] min-h-[240px]"
-                  title={qrMode === 'direct' ? "Scan with standard phone camera to download APK" : "Scan during Android 6-taps Welcome screen"}
+                  className="p-3 bg-white rounded-2xl shadow-xl hover:scale-105 transition-transform duration-300 cursor-pointer flex items-center justify-center min-w-[220px] min-h-[220px]"
+                  title="Scan with phone camera to download APK"
                 >
                   {qrDataUrl ? (
                     <img 
                       src={qrDataUrl} 
-                      alt="Installment Guard APK Download QR" 
-                      className="w-[230px] h-[230px] object-contain rounded-lg"
+                      alt="APK Download QR" 
+                      className="w-[210px] h-[210px] object-contain rounded-lg"
                     />
                   ) : (
-                    <div className="w-[230px] h-[230px] flex items-center justify-center text-slate-400 text-xs">
-                      Generating standard QR Code...
+                    <div className="w-[210px] h-[210px] flex items-center justify-center text-slate-400 text-xs">
+                      Generating QR Code...
                     </div>
                   )}
                 </div>
                 <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5 text-center">
-                  <Wifi className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  {qrMode === 'direct' 
-                    ? 'Scan with standard Phone Camera or QR app to download APK' 
-                    : 'Scan with Android 6-Taps Provisioning Reader (Reset Screen)'}
+                  <Wifi className={`w-3.5 h-3.5 shrink-0 ${selectedApk === 'guard' ? 'text-amber-400' : 'text-teal-400'}`} />
+                  {selectedApk === 'retailer' 
+                    ? 'Scan with Retailer phone to download Retailer App'
+                    : (qrMode === 'direct' 
+                        ? 'Scan with customer camera to download Guard APK' 
+                        : 'Scan with Android 6-Taps Provisioning Reader')}
                 </p>
               </div>
 
               {/* URL Customizer & Direct Buttons */}
               <div className="space-y-4">
-                {effectiveRetailerId && (
-                  <div className="p-3 rounded-2xl bg-teal-950/80 border border-teal-500/40 flex items-center justify-between text-xs shadow-inner">
-                    <div className="flex items-center gap-2 text-teal-300 font-bold">
-                      <Building2 className="w-4 h-4 text-teal-400 shrink-0" />
-                      <div>
-                        <div>{retailerName}</div>
-                        <div className="text-[10px] text-teal-400/80 font-normal">Devices will auto-bind to your store dashboard</div>
-                      </div>
-                    </div>
-                    <span className="font-mono px-2.5 py-1 rounded-lg bg-teal-900/90 border border-teal-700/50 text-teal-200 text-xs font-black tracking-wider">
-                      {effectiveRetailerId}
-                    </span>
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                     Server Host / Cloud Domain
@@ -221,25 +265,29 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                       value={serverHost}
                       onChange={(e) => setServerHost(e.target.value)}
                       placeholder="e.g. instalment-guard-production-8ff6.up.railway.app"
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-400 transition-colors font-mono"
+                      className={`flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 focus:outline-none transition-colors font-mono ${
+                        selectedApk === 'guard' ? 'focus:border-amber-400' : 'focus:border-teal-400'
+                      }`}
                     />
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Points to live cloud backend. Mobile app automatically checks in with this server.
+                    Points to live cloud backend. APK connects to this domain for commands & telemetry.
                   </p>
                 </div>
 
                 {/* Full Download URL Display */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Direct APK Download URL
+                    {selectedApk === 'guard' ? 'Customer Guard APK URL' : 'Retailer App APK URL'}
                   </label>
                   <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl p-2">
                     <input
                       type="text"
                       readOnly
-                      value={apkUrl}
-                      className="flex-1 bg-transparent text-xs font-mono text-amber-400 outline-none px-2 truncate"
+                      value={currentApkUrl}
+                      className={`flex-1 bg-transparent text-xs font-mono outline-none px-2 truncate ${
+                        selectedApk === 'guard' ? 'text-amber-400' : 'text-teal-400'
+                      }`}
                     />
                     <button
                       onClick={handleCopyLink}
@@ -255,20 +303,25 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                 {/* Direct Action Buttons */}
                 <div className="pt-2 flex flex-col gap-2.5">
                   <a
-                    href={apkUrl}
-                    download="installment_guard.apk"
+                    href={currentApkUrl}
+                    download={selectedApk === 'guard' ? 'installment_guard.apk' : 'retailer_app.apk'}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                    className={`w-full py-3 px-4 font-black rounded-xl text-sm shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                      selectedApk === 'guard'
+                        ? 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 shadow-amber-400/20'
+                        : 'bg-gradient-to-r from-teal-400 to-teal-500 hover:from-teal-300 hover:to-teal-400 text-slate-950 shadow-teal-400/20'
+                    }`}
                   >
                     <Download className="w-4 h-4 text-slate-950" />
-                    Download APK File Direct (18.4 MB)
+                    {selectedApk === 'guard' ? 'Download Guard APK (Customer Device)' : 'Download Retailer APK (Shopkeeper)'}
                   </a>
 
                   <div className="flex items-center justify-between text-xs text-slate-400 px-1 pt-1">
-                    <span>Android 8.0 to 14.0 Supported</span>
+                    <span>Android 8.0 - 15.0</span>
                     <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Anti-Tamper MDM Ready
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      {selectedApk === 'guard' ? 'Anti-Tamper MDM DPC' : 'Secure JWT Auth'}
                     </span>
                   </div>
                 </div>
@@ -327,8 +380,8 @@ export default function AppDownloadModal({ isOpen, onClose }) {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <span>Installment Guard MDM Engine v1.0.0</span>
+        <div className="px-6 py-4 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <span>Dual APK Distribution: Customer Guard & Retailer Management</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium transition-colors"
@@ -341,3 +394,4 @@ export default function AppDownloadModal({ isOpen, onClose }) {
     </div>
   );
 }
+

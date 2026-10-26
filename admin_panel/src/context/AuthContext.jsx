@@ -274,10 +274,15 @@ export const AuthProvider = ({ children }) => {
     const result = await authService.login(email, password);
     const authUser = result.user;
 
+    if (authUser.role === 'RETAILER') {
+      await authService.logout();
+      throw new Error('Retailer accounts must log in using the Installment Guard Retailer Android Mobile App. This web portal is strictly for Super Admin HQ.');
+    }
+
     setCurrentUser(authUser);
     setUserProfile(authUser);
-    setRole(authUser.role || 'SUPER_ADMIN');
-    setActiveRetailerId(authUser.retailerId || 'SUPER_ADMIN');
+    setRole('SUPER_ADMIN');
+    setActiveRetailerId('SUPER_ADMIN');
 
     return { user: authUser, profile: authUser, token: result.token };
   };
