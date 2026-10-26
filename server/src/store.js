@@ -263,7 +263,7 @@ class DataStore {
       const cleanImei = d.imei ? d.imei.toString().replace(/[^0-9]/g, '') : '';
       const key = (cleanImei.length >= 6)
         ? `imei-${cleanImei}`
-        : (d.model ? `model-${d.model}` : (d.physicalDeviceId || d.deviceId));
+        : (d.physicalDeviceId || d.deviceId);
 
       if (!uniqueMap.has(key)) {
         uniqueMap.set(key, d);
@@ -380,18 +380,6 @@ class DataStore {
       existing = allDevs.find((d) => {
         const dbImei = (d.imei || '').toString().replace(/[^0-9]/g, '');
         return dbImei && (dbImei.includes(rawImei) || rawImei.includes(dbImei));
-      });
-    }
-
-    if (!existing && deviceData.model) {
-      const allDevs = await DeviceModel.findAll();
-      existing = allDevs.find((d) => d.model === deviceData.model);
-    }
-
-    if (!existing) {
-      existing = await DeviceModel.findOne({
-        where: { physicalDeviceId: null },
-        order: [['createdAt', 'DESC']],
       });
     }
 
