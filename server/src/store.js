@@ -921,15 +921,27 @@ class DataStore {
     return false;
   }
 
-  async addCommand(command) {
+  async addCommand(commandOrDeviceId, commandType = null, payload = null, retailerId = null) {
     await this.initDb();
+    let devId, cmdType, payLoad, retId;
+    if (typeof commandOrDeviceId === 'object' && commandOrDeviceId !== null) {
+      devId = commandOrDeviceId.deviceId;
+      cmdType = commandOrDeviceId.commandType;
+      payLoad = commandOrDeviceId.payload || {};
+      retId = commandOrDeviceId.retailerId || 'RET-101';
+    } else {
+      devId = commandOrDeviceId;
+      cmdType = commandType;
+      payLoad = payload || {};
+      retId = retailerId || 'RET-101';
+    }
     const newCmd = await AdminCommandModel.create({
       commandId: `CMD-${Date.now()}`,
-      deviceId: command.deviceId,
-      retailerId: command.retailerId || 'RET-101',
-      commandType: command.commandType,
+      deviceId: devId,
+      retailerId: retId,
+      commandType: cmdType,
       status: 'PENDING',
-      payload: command.payload || {},
+      payload: payLoad,
     });
     return newCmd.toJSON();
   }

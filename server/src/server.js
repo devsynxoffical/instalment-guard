@@ -431,6 +431,20 @@ app.get('/api/retailers', async (req, res) => {
   }
 });
 
+// GET Specific Retailer
+app.get('/api/retailers/:retailerId', async (req, res) => {
+  try {
+    const retailer = await store.getRetailerById(req.params.retailerId);
+    if (retailer) {
+      res.json({ success: true, data: retailer });
+    } else {
+      res.status(404).json({ success: false, message: 'Retailer not found' });
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // POST Create/Update Retailer
 app.post('/api/retailers', async (req, res) => {
   try {
@@ -844,27 +858,40 @@ app.post('/api/commands/dispatch', async (req, res) => {
   }
 });
 
-// GET Pending Commands
-app.get('/api/commands/pending/:deviceId', async (req, res) => {
+// GET Pending Commands (supports both /api/commands/pending/:deviceId and /api/devices/:deviceId/commands)
+app.get(['/api/commands/pending/:deviceId', '/api/devices/:deviceId/commands'], async (req, res) => {
   try {
     const { deviceId } = req.params;
     const pendingCmds = await store.getPendingCommands(deviceId);
-    res.json({ success: true, data: pendingCmds });
+    res.json({ success: true, count: pendingCmds.length, data: pendingCmds });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });
 
-// POST Acknowledge Command
-app.post('/api/commands/ack', async (req, res) => {
+// POST Acknowledge Command (supports /api/commands/ack and /api/devices/:deviceId/commands/:commandId/ack)
+app.post(['/api/commands/ack', '/api/devices/:deviceId/commands/:commandId/ack'], async (req, res) => {
   try {
-    const { commandId, success, failureReason } = req.body;
+    const commandId = req.params.commandId || req.body.commandId;
+    const { status, failureReason } = req.body;
+    const success = status === 'EXECUTED' || req.body.success !== false;
     const cmd = await store.ackCommand(commandId, success, failureReason);
     if (cmd) {
       res.json({ success: true, data: cmd });
     } else {
       res.status(404).json({ success: false, message: 'Command ID not found' });
     }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET Defaulters Blacklist
+app.get('/api/blacklist', async (req, res) => {
+  try {
+    const contracts = await store.getContracts();
+    const blacklisted = contracts.filter((c) => c.status === 'RESTRICTED' || c.status === 'DEFAULTER');
+    res.json({ success: true, count: blacklisted.length, data: blacklisted });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -881,24 +908,19 @@ app.get('/api/contracts', async (req, res) => {
   }
 });
 
-// GET Retailers
-app.get('/api/retailers', async (req, res) => {
+// POST Allocate Credits (supports both /api/retailers/credits and /api/retailers/:retailerId/credits)
+app.post(['/api/retailers/credits', '/api/retailers/:retailerId/credits'], async (req, res) => {
   try {
-    const list = await store.getRetailers();
-    res.json({ success: true, data: list });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
-
-// POST Allocate Credits
-app.post('/api/retailers/credits', async (req, res) => {
-  try {
-    const { retailerId, amount, performer } = req.body;
-    const retailer = await store.allocateCredits(retailerId, parseInt(amount) || 0, performer);
+    const retailerId = req.params.retailerId || req.body.retailerId;
+    const amount = parseInt(req.body.amount, 10);
+    const performer = req.body.performer || req.body.performerName || 'Super Admin';
+    if (!retailerId || isNaN(amount)) {
+      return res.status(400).json({ success: false, message: 'Valid retailerId and credit amount are required' });
+    }
+    const retailer = await store.allocateCredits(retailerId, amount, performer);
     if (retailer) {
       io.emit('retailer_updated', retailer);
-      res.json({ success: true, data: retailer });
+      res.json({ success: true, message: `Successfully allocated ${amount} credits`, data: retailer });
     } else {
       res.status(404).json({ success: false, message: 'Retailer not found' });
     }
@@ -927,7 +949,7 @@ app.post('/api/retailers/toggle-status', async (req, res) => {
 app.post('/api/retailers/:retailerId/password', async (req, res) => {
   try {
     const { retailerId } = req.params;
-    const { password } = req.body;
+    const password = req.body.password || req.body.newPassword;
     if (!password) {
       return res.status(400).json({ success: false, message: 'New password is required' });
     }
