@@ -10,6 +10,8 @@ import {
   query,
   orderBy,
 } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { auditService } from './auditService';
 import { API_BASE_URL } from '../config/api';
 
 const BACKEND_API = `${API_BASE_URL}/api`;
@@ -18,36 +20,72 @@ export const retailerService = {
   // Fetch all retailers
   async fetchRetailers() {
     try {
-      const q = query(collection(db, 'retailers'), orderBy('businessName', 'asc'));
-      const snap = await getDocs(q);
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      return list;
+      const res = await fetch(`${BACKEND_API}/retailers`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      if (db) {
+        const q = query(collection(db, 'retailers'), orderBy('businessName', 'asc'));
+        const snap = await getDocs(q);
+        const list = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        return list;
+      }
     } catch (error) {
       console.warn('Firestore Fetch Retailers Error:', error);
-      return [];
     }
+    return [];
   },
 
-  // Real-time listener for retailers
+  // Real-time listener for retailers with Node.js backend fallback
   subscribeRetailers(callback) {
-    try {
-      const q = query(collection(db, 'retailers'), orderBy('businessName', 'asc'));
-      return onSnapshot(
-        q,
-        (snap) => {
-          const list = [];
-          snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-          callback(list);
-        },
-        (error) => {
-          console.warn('Retailers Subscription Warning:', error);
+    let isSubscribed = true;
+
+    // 1. Initial and recurring poll against Node.js Live Backend
+    const pollBackend = async () => {
+      try {
+        const res = await fetch(`${BACKEND_API}/retailers`);
+        if (res.ok && isSubscribed) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data)) {
+            callback(json.data);
+          }
         }
-      );
-    } catch (error) {
-      console.warn('Retailers Subscription Error:', error);
-      return () => {};
-    }
+      } catch (_) {}
+    };
+
+    pollBackend();
+    const intervalId = setInterval(pollBackend, 5000);
+
+    // 2. Also listen via Firestore if db is active
+    let unsubFirestore = () => {};
+    try {
+      if (db) {
+        const q = query(collection(db, 'retailers'), orderBy('businessName', 'asc'));
+        unsubFirestore = onSnapshot(
+          q,
+          (snap) => {
+            if (!isSubscribed) return;
+            const list = [];
+            snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+            if (list.length > 0) callback(list);
+          },
+          () => {}
+        );
+      }
+    } catch (_) {}
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(intervalId);
+      unsubFirestore();
+    };
   },
 
   // Create new Retailer
@@ -80,7 +118,11 @@ export const retailerService = {
         });
       } catch (_) {}
 
-      await setDoc(doc(db, 'retailers', retailerId), newRetailer);
+      if (db) {
+        try {
+          await setDoc(doc(db, 'retailers', retailerId), newRetailer);
+        } catch (_) {}
+      }
 
       // Audit Log
       await auditService.addLog({
@@ -101,38 +143,50 @@ export const retailerService = {
   // Allocate Credits (Atomic Transaction)
   async allocateCredits(retailerId, count, reason = 'Super Admin Allocation', performerName = 'Super Admin') {
     try {
-      await runTransaction(db, async (transaction) => {
-        const retailerRef = doc(db, 'retailers', retailerId);
-        const retailerDoc = await transaction.get(retailerRef);
-
-        if (!retailerDoc.exists()) {
-          throw new Error('Retailer does not exist!');
-        }
-
-        const currentCredits = retailerDoc.data().credits || 0;
-        const newBalance = currentCredits + count;
-        const currentSpent = retailerDoc.data().totalSpent || 0;
-
-        transaction.update(retailerRef, {
-          credits: newBalance,
-          totalSpent: currentSpent + count * 1000,
-          updatedAt: serverTimestamp(),
+      try {
+        await fetch(`${BACKEND_API}/retailers/${encodeURIComponent(retailerId)}/credits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: count, reason, performer: performerName }),
         });
+      } catch (_) {}
 
-        // Credit transaction document
-        const txRef = doc(collection(db, 'creditTransactions'));
-        transaction.set(txRef, {
-          txId: txRef.id,
-          retailerId,
-          type: 'ALLOCATED',
-          amount: count,
-          balanceBefore: currentCredits,
-          balanceAfter: newBalance,
-          reason,
-          createdBy: performerName,
-          createdAt: serverTimestamp(),
-        });
-      });
+      if (db) {
+        try {
+          await runTransaction(db, async (transaction) => {
+            const retailerRef = doc(db, 'retailers', retailerId);
+            const retailerDoc = await transaction.get(retailerRef);
+
+            if (!retailerDoc.exists()) {
+              return;
+            }
+
+            const currentCredits = retailerDoc.data().credits || 0;
+            const newBalance = currentCredits + count;
+            const currentSpent = retailerDoc.data().totalSpent || 0;
+
+            transaction.update(retailerRef, {
+              credits: newBalance,
+              totalSpent: currentSpent + count * 1000,
+              updatedAt: serverTimestamp(),
+            });
+
+            // Credit transaction document
+            const txRef = doc(collection(db, 'creditTransactions'));
+            transaction.set(txRef, {
+              txId: txRef.id,
+              retailerId,
+              type: 'ALLOCATED',
+              amount: count,
+              balanceBefore: currentCredits,
+              balanceAfter: newBalance,
+              reason,
+              createdBy: performerName,
+              createdAt: serverTimestamp(),
+            });
+          });
+        } catch (_) {}
+      }
 
       // Audit Log
       await auditService.addLog({
@@ -153,11 +207,23 @@ export const retailerService = {
   // Toggle Retailer Status (Activate / Suspend)
   async toggleRetailerStatus(retailerId, newStatus, performerName = 'Super Admin') {
     try {
-      const retailerRef = doc(db, 'retailers', retailerId);
-      await updateDoc(retailerRef, {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        await fetch(`${BACKEND_API}/retailers/${encodeURIComponent(retailerId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+      } catch (_) {}
+
+      if (db) {
+        try {
+          const retailerRef = doc(db, 'retailers', retailerId);
+          await updateDoc(retailerRef, {
+            status: newStatus,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (_) {}
+      }
 
       await auditService.addLog({
         performer: performerName,
