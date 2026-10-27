@@ -16,14 +16,27 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Unique Application ID
         applicationId = "com.example.installment_guard"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appName"] = "Installment Guard"
+    }
+
+    flavorDimensions += "app"
+    productFlavors {
+        create("guard") {
+            dimension = "app"
+            applicationId = "com.example.installment_guard"
+            manifestPlaceholders["appName"] = "Installment Guard"
+        }
+        create("retailer") {
+            dimension = "app"
+            applicationId = "com.example.installment_guard.retailer"
+            manifestPlaceholders["appName"] = "Retailer Hub"
+        }
     }
 
     buildTypes {

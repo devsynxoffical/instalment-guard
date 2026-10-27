@@ -32,12 +32,12 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
     ),
   );
 
+  bool _isRetailerApp = false;
+
   @override
   void initState() {
     super.initState();
-    DeviceManagementService.restrictionNotifier.addListener(_onRestrictionChanged);
     _determineInitialRoute();
-    _startHeartbeatTimer();
   }
 
   @override
@@ -48,18 +48,14 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
   }
 
   void _onRestrictionChanged() {
+    if (_isRetailerApp) return;
     final isRestricted = DeviceManagementService.restrictionNotifier.value;
     if (mounted) {
-      // Only switch screen automatically if not logged in to Retailer App
-      _retailerApiService.getStoredSession().then((session) {
-        if (session == null && mounted) {
-          setState(() {
-            if (isRestricted) {
-              _homeScreen = const DeviceRestrictedScreen();
-            } else {
-              _homeScreen = const DeviceReadyScreen();
-            }
-          });
+      setState(() {
+        if (isRestricted) {
+          _homeScreen = const DeviceRestrictedScreen();
+        } else {
+          _homeScreen = const DeviceReadyScreen();
         }
       });
     }
@@ -73,18 +69,28 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
   }
 
   Future<void> _determineInitialRoute() async {
-    // 1. Check if retailer is currently logged in on this phone
-    final retailerSession = await _retailerApiService.getStoredSession();
-    if (retailerSession != null && retailerSession.token.isNotEmpty) {
+    // 1. Check application identity (package name)
+    final pkgName = await _deviceService.getPackageName();
+    final isRetailer = pkgName.contains('retailer');
+
+    if (isRetailer) {
+      _isRetailerApp = true;
+      final retailerSession = await _retailerApiService.getStoredSession();
       if (mounted) {
         setState(() {
-          _homeScreen = RetailerMainShell(initialSession: retailerSession);
+          if (retailerSession != null && retailerSession.token.isNotEmpty) {
+            _homeScreen = RetailerMainShell(initialSession: retailerSession);
+          } else {
+            _homeScreen = const RetailerLoginScreen();
+          }
         });
       }
       return;
     }
 
-    // 2. Sync live device status
+    // 2. Customer Guard Device logic
+    DeviceManagementService.restrictionNotifier.addListener(_onRestrictionChanged);
+    _startHeartbeatTimer();
     await _deviceService.syncDeviceStatus();
 
     final statusResult = await _deviceService.getEnrollmentStatus();
@@ -103,8 +109,8 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
     } else if (isManaged || status == 'COMPLETED') {
       targetWidget = const DeviceReadyScreen();
     } else {
-      // Default entry point: Retailer Login Screen!
-      targetWidget = const RetailerLoginScreen();
+      // Unmanaged customer device setup screen
+      targetWidget = const DeviceReadyScreen();
     }
 
     if (mounted) {
@@ -117,7 +123,7 @@ class _InstallmentGuardAppState extends State<InstallmentGuardApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Installment Guard',
+      title: _isRetailerApp ? 'Retailer Hub - Installment Guard' : 'Installment Guard',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

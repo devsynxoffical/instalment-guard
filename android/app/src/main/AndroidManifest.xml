@@ -16,7 +16,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="Installment Guard"
+        android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:testOnly="false"
@@ -42,7 +42,7 @@
             android:targetActivity=".MainActivity"
             android:enabled="true"
             android:exported="true"
-            android:label="Installment Guard">
+            android:label="${appName}">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

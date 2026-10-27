@@ -23,6 +23,15 @@ class DeviceManagementResult<T> {
 class DeviceManagementService {
   static const MethodChannel _channel = MethodChannel(AppConstants.methodChannelName);
 
+  Future<String> getPackageName() async {
+    try {
+      final String? pkg = await _channel.invokeMethod<String>('getPackageName');
+      return pkg ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Future<DeviceManagementResult<String>> getEnrollmentStatus() async {
     try {
       final String? status = await _channel.invokeMethod<String>('getEnrollmentStatus');

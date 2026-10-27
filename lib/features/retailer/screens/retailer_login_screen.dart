@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../setup/screens/device_ready_screen.dart';
-import '../../setup/screens/device_restricted_screen.dart';
-import '../../../services/device_management/device_management_service.dart';
 import '../services/retailer_api_service.dart';
 import 'retailer_main_shell.dart';
 
@@ -76,19 +73,6 @@ class _RetailerLoginScreenState extends State<RetailerLoginScreen> {
       _passwordController.text = 'Retailer@12345';
       _errorMessage = null;
     });
-  }
-
-  void _switchToCustomerDeviceMode() async {
-    final isRestricted = DeviceManagementService.restrictionNotifier.value;
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => isRestricted
-              ? const DeviceRestrictedScreen()
-              : const DeviceReadyScreen(),
-        ),
-      );
-    }
   }
 
   @override
@@ -334,15 +318,32 @@ class _RetailerLoginScreenState extends State<RetailerLoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Customer Phone Guard Mode Switch
-                  TextButton.icon(
-                    onPressed: _switchToCustomerDeviceMode,
-                    icon: const Icon(Icons.phone_android_rounded, size: 16, color: Color(0xFF64748B)),
-                    label: const Text(
-                      'Customer Phone Mode (Device Lock Client)',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B), decoration: TextDecoration.underline),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.storefront_rounded, size: 14, color: AppTheme.tealPrimary),
+                            SizedBox(width: 6),
+                            Text(
+                              'Installment Guard • Retailer Hub Edition',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

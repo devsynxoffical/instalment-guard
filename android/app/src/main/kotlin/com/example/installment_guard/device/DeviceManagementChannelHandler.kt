@@ -21,6 +21,9 @@ class DeviceManagementChannelHandler(private val activity: Activity) : MethodCha
 
         try {
             when (call.method) {
+                "getPackageName" -> {
+                    result.success(context.packageName)
+                }
                 "getEnrollmentStatus" -> {
                     val prefs = context.getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
                     val status = prefs.getString("enrollment_status", "NOT_ENROLLED") ?: "NOT_ENROLLED"

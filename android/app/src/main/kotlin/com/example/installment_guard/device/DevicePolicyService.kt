@@ -587,6 +587,7 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
 
     fun getDeviceInformation(): Map<String, Any> {
         val info = mutableMapOf<String, Any>()
+        info["packageName"] = context.packageName
         
         val prefs = context.getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
         val contractId = prefs.getString("contract_id", "") ?: ""
