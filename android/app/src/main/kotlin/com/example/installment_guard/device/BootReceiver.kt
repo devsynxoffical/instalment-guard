@@ -16,6 +16,9 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (context.packageName.contains("retailer")) {
+            return
+        }
         try {
             val action = intent.action
             Log.i(TAG, "Device boot event received: $action")

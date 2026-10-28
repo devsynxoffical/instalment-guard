@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../services/device_management/device_management_service.dart';
 import '../services/retailer_api_service.dart';
 import 'retailer_main_shell.dart';
 
@@ -77,11 +78,28 @@ class _RetailerLoginScreenState extends State<RetailerLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await DeviceManagementService().closeApp();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned(
+                top: 8,
+                right: 12,
+                child: IconButton(
+                  tooltip: 'Exit App',
+                  icon: const Icon(Icons.power_settings_new_rounded, color: Color(0xFF94A3B8)),
+                  onPressed: () => DeviceManagementService().closeApp(),
+                ),
+              ),
+              Center(
+                child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
@@ -350,7 +368,10 @@ class _RetailerLoginScreenState extends State<RetailerLoginScreen> {
             ),
           ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+),
+);
   }
 }

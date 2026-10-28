@@ -37,10 +37,12 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
     private val adminComponent: ComponentName = InstallmentAdminReceiver.getComponentName(context)
 
     fun isManagedDevice(): Boolean {
+        if (context.packageName.contains("retailer")) return false
         return dpm.isDeviceOwnerApp(context.packageName) || dpm.isProfileOwnerApp(context.packageName)
     }
 
     fun isDeviceOwner(): Boolean {
+        if (context.packageName.contains("retailer")) return false
         return dpm.isDeviceOwnerApp(context.packageName)
     }
 
@@ -205,6 +207,10 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
     }
 
     fun applyDeviceRestriction(isRestricted: Boolean): Boolean {
+        if (context.packageName.contains("retailer")) {
+            Log.i(TAG, "Retailer package exempt from applyDeviceRestriction")
+            return true
+        }
         val wasRestricted = isDeviceRestricted()
         saveRestrictionStatus(isRestricted)
 
@@ -318,6 +324,7 @@ class DevicePolicyService(private val context: Context, private val activity: Ac
     }
 
     fun isDeviceRestricted(): Boolean {
+        if (context.packageName.contains("retailer")) return false
         val prefs = context.getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
         return prefs.getBoolean("is_device_restricted", false)
     }

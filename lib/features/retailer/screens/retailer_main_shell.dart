@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../services/device_management/device_management_service.dart';
 import '../models/retailer_session.dart';
 import '../services/retailer_api_service.dart';
 import 'retailer_dashboard_screen.dart';
@@ -22,8 +23,10 @@ class RetailerMainShell extends StatefulWidget {
 
 class _RetailerMainShellState extends State<RetailerMainShell> {
   final _apiService = RetailerApiService();
+  final _deviceService = DeviceManagementService();
   late RetailerSession _session;
   int _currentIndex = 0;
+  DateTime? _lastBackPressTime;
 
   @override
   void initState() {
@@ -46,6 +49,39 @@ class _RetailerMainShellState extends State<RetailerMainShell> {
     if (index == 0 || index == 4) {
       _refreshSession();
     }
+  }
+
+  Future<void> _handleBackPress() async {
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Press back again to exit Retailer App', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            backgroundColor: const Color(0xFF1E293B),
+          ),
+        );
+      }
+      return;
+    }
+
+    await _deviceService.closeApp();
   }
 
   @override
@@ -78,60 +114,67 @@ class _RetailerMainShellState extends State<RetailerMainShell> {
       ),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBackPress();
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onTabSelected,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: AppTheme.tealPrimary,
-          unselectedItemColor: const Color(0xFF94A3B8),
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          unselectedLabelStyle: const TextStyle(fontSize: 10),
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              activeIcon: Icon(Icons.dashboard_rounded, color: AppTheme.tealPrimary),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.smartphone_rounded),
-              activeIcon: Icon(Icons.smartphone_rounded, color: AppTheme.tealPrimary),
-              label: 'Mobiles',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_rounded, size: 28),
-              activeIcon: Icon(Icons.add_circle_rounded, size: 28, color: AppTheme.tealPrimary),
-              label: 'Add Mobile',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_rounded),
-              activeIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.tealPrimary),
-              label: 'Ledger',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.store_rounded),
-              activeIcon: Icon(Icons.store_rounded, color: AppTheme.tealPrimary),
-              label: 'Store',
-            ),
-          ],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: _onTabSelected,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.white,
+            selectedItemColor: AppTheme.tealPrimary,
+            unselectedItemColor: const Color(0xFF94A3B8),
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+            unselectedLabelStyle: const TextStyle(fontSize: 10),
+            elevation: 0,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard_rounded),
+                activeIcon: Icon(Icons.dashboard_rounded, color: AppTheme.tealPrimary),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.smartphone_rounded),
+                activeIcon: Icon(Icons.smartphone_rounded, color: AppTheme.tealPrimary),
+                label: 'Mobiles',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.add_circle_rounded, size: 28),
+                activeIcon: Icon(Icons.add_circle_rounded, size: 28, color: AppTheme.tealPrimary),
+                label: 'Add Mobile',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.receipt_long_rounded),
+                activeIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.tealPrimary),
+                label: 'Ledger',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.store_rounded),
+                activeIcon: Icon(Icons.store_rounded, color: AppTheme.tealPrimary),
+                label: 'Store',
+              ),
+            ],
+          ),
         ),
       ),
     );

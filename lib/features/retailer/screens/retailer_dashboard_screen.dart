@@ -3,6 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../models/retailer_session.dart';
 import '../services/retailer_api_service.dart';
 import '../widgets/enrollment_qr_dialog.dart';
+import '../../../services/device_management/device_management_service.dart';
 import 'defaulter_check_screen.dart';
 import 'retailer_device_detail_screen.dart';
 
@@ -127,10 +128,41 @@ class _RetailerDashboardScreenState extends State<RetailerDashboardScreen> {
         elevation: 0.5,
         actions: [
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
             onPressed: () {
               widget.onRefreshRequested();
               _loadDashboardData();
+            },
+          ),
+          IconButton(
+            tooltip: 'Exit Application',
+            icon: const Icon(Icons.power_settings_new_rounded, color: AppTheme.dangerRed),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Exit Application?', style: TextStyle(fontWeight: FontWeight.bold)),
+                  content: const Text('Are you sure you want to close the Retailer App?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.dangerRed,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Close App'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await DeviceManagementService().closeApp();
+              }
             },
           ),
         ],

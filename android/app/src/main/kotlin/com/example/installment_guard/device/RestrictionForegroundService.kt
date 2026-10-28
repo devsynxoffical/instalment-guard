@@ -30,6 +30,10 @@ class RestrictionForegroundService : Service() {
         private var isSyncLoopRunning = false
 
         fun startService(context: Context) {
+            if (context.packageName.contains("retailer")) {
+                Log.i(TAG, "Retailer package exempt from RestrictionForegroundService")
+                return
+            }
             try {
                 val intent = Intent(context, RestrictionForegroundService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -64,6 +68,10 @@ class RestrictionForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (packageName.contains("retailer")) {
+            stopSelf()
+            return
+        }
         createNotificationChannel()
         try {
             startForeground(NOTIF_ID, createNotification())
@@ -74,6 +82,10 @@ class RestrictionForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (packageName.contains("retailer")) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         Log.i(TAG, "RestrictionForegroundService started on background event")
 
         try {

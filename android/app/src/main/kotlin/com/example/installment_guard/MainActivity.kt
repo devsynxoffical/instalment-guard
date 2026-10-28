@@ -12,14 +12,20 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
+    private val isRetailerApp: Boolean
+        get() = packageName.endsWith(".retailer") || packageName.contains("retailer")
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        requestLocationPermissionsIfNeeded()
+        // Only enforce device policies and request location for the Customer Guard App
+        if (!isRetailerApp) {
+            requestLocationPermissionsIfNeeded()
 
-        val policyService = DevicePolicyService(this, this)
-        if (policyService.isManagedDevice()) {
-            policyService.applyPolicyRestrictions()
+            val policyService = DevicePolicyService(this, this)
+            if (policyService.isManagedDevice()) {
+                policyService.applyPolicyRestrictions()
+            }
         }
 
         val channelHandler = DeviceManagementChannelHandler(this)
@@ -49,6 +55,22 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (isRetailerApp) {
+            // Guarantee Retailer App is completely free of any lock task or lock window flags
+            if (isAlreadyLocked()) {
+                try {
+                    stopLockTask()
+                } catch (_: Exception) {}
+            }
+            window.clearFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+            return
+        }
+
         val policyService = DevicePolicyService(this, this)
         if (policyService.isManagedDevice()) {
             policyService.applyPolicyRestrictions()
@@ -59,11 +81,18 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        enforceLockStateIfNeeded()
+        if (!isRetailerApp) {
+            enforceLockStateIfNeeded()
+        }
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        if (isRetailerApp) {
+            // Retailer App can be minimized, backgrounded, or closed normally
+            return
+        }
+
         val policyService = DevicePolicyService(this, this)
         if (policyService.isDeviceRestricted() && !policyService.isManagedDevice()) {
             try {
@@ -83,9 +112,16 @@ class MainActivity : FlutterActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (isRetailerApp) {
+            // Allow normal back button behavior on the Retailer App
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+            return
+        }
+
         val policyService = DevicePolicyService(this, this)
         if (policyService.isDeviceRestricted()) {
-            // Block back button completely when restricted
+            // Block back button completely when restricted on Customer device
             return
         }
         @Suppress("DEPRECATION")
@@ -107,6 +143,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun enforceLockStateIfNeeded() {
+        if (isRetailerApp) return
+
         try {
             val policyService = DevicePolicyService(this, this)
             if (policyService.isDeviceRestricted()) {

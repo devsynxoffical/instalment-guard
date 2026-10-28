@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../setup/screens/device_ready_screen.dart';
-import '../../setup/screens/device_restricted_screen.dart';
 import '../../../services/device_management/device_management_service.dart';
 import '../models/retailer_session.dart';
 import '../services/retailer_api_service.dart';
@@ -102,13 +100,32 @@ class _RetailerProfileScreenState extends State<RetailerProfileScreen> {
     }
   }
 
-  void _switchToCustomerMode() {
-    final isRestricted = DeviceManagementService.restrictionNotifier.value;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => isRestricted ? const DeviceRestrictedScreen() : const DeviceReadyScreen(),
+  Future<void> _handleCloseApp() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit Application?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to close the Retailer App?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.dangerRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Close App'),
+          ),
+        ],
       ),
     );
+
+    if (confirm == true) {
+      await DeviceManagementService().closeApp();
+    }
   }
 
   @override
@@ -268,7 +285,7 @@ class _RetailerProfileScreenState extends State<RetailerProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Switch to Customer Guard Mode
+            // Exit Retailer Application Button
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -280,13 +297,13 @@ class _RetailerProfileScreenState extends State<RetailerProfileScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.phone_android_rounded, color: Color(0xFF475569)),
+                  decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.power_settings_new_rounded, color: AppTheme.dangerRed),
                 ),
-                title: const Text('Customer Phone Guard Mode', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                subtitle: const Text('View the client lock overlay & status screen', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                title: const Text('Exit Retailer Application', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                subtitle: const Text('Completely minimize or close the retailer app', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                 trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                onTap: _switchToCustomerMode,
+                onTap: _handleCloseApp,
               ),
             ),
             const SizedBox(height: 20),

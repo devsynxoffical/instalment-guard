@@ -189,5 +189,15 @@ class DeviceManagementService {
       return DeviceManagementResult.failure('Unexpected wipe failure: $e');
     }
   }
+
+  Future<void> closeApp() async {
+    try {
+      await _channel.invokeMethod('closeApp');
+    } catch (_) {
+      try {
+        await SystemNavigator.pop();
+      } catch (_) {}
+    }
+  }
 }
 

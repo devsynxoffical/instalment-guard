@@ -88,6 +88,20 @@ class DeviceManagementChannelHandler(private val activity: Activity) : MethodCha
                     activity.moveTaskToBack(true)
                     result.success(true)
                 }
+                "closeApp" -> {
+                    try {
+                        activity.finishAffinity()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            activity.finishAndRemoveTask()
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            activity.finish()
+                            result.success(true)
+                        }
+                    }
+                }
                 "syncDeviceStatus" -> {
                     val prefs = context.getSharedPreferences("installment_guard_admin_prefs", Context.MODE_PRIVATE)
                     val lastCheckIn = prefs.getLong("last_check_in_timestamp", 0L)
